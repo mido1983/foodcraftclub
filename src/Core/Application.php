@@ -3,6 +3,7 @@
 namespace App\Core;
 
 use App\Core\Exception\ForbiddenException;
+use App\Core\Logger;
 use App\Core\Middleware\AdminRouteMiddleware;
 
 class Application {
@@ -14,6 +15,7 @@ class Application {
     public ?Controller $controller = null;
     public Session $session;
     public View $view;
+    public Logger $logger;
 
     public function __construct(public string $rootPath) {
         self::$app = $this;
@@ -23,6 +25,7 @@ class Application {
         $this->db = new Database(); // Initialize database first
         $this->session = new Session(); // Then initialize session
         $this->view = new View();
+        $this->logger = new Logger();
         
         // Register global middlewares
         $this->router->middleware(new AdminRouteMiddleware());

@@ -82,11 +82,21 @@ use App\Core\Application;
 
                 <div class="mb-3">
                     <label for="status" class="form-label">Status</label>
+                    
+                    <!-- Отладочная информация о статусе пользователя -->
+                    <div class="alert alert-info mb-2">
+                        <strong>Текущий статус:</strong> 
+                        <span class="badge <?= $user->status === 'active' ? 'bg-success' : ($user->status === 'pending' ? 'bg-warning' : 'bg-danger') ?>">
+                            <?= ucfirst(htmlspecialchars($user->status)) ?>
+                        </span>
+                    </div>
+                    
                     <select class="form-select" id="status" name="status">
-                        <option value="active" <?= $user->status === 'active' ? 'selected' : '' ?>>Active</option>
-                        <option value="pending" <?= $user->status === 'pending' ? 'selected' : '' ?>>Pending</option>
-                        <option value="suspended" <?= $user->status === 'suspended' ? 'selected' : '' ?>>Suspended</option>
+                        <option value="active" <?= $user->status === 'active' ? 'selected' : '' ?>>Активный</option>
+                        <option value="pending" <?= $user->status === 'pending' ? 'selected' : '' ?>>Ожидает</option>
+                        <option value="suspended" <?= $user->status === 'suspended' ? 'selected' : '' ?>>Заблокирован</option>
                     </select>
+                    <div class="form-text text-muted">Выберите статус пользователя. Только пользователи со статусом "Активный" могут войти в систему.</div>
                 </div>
 
                 <div class="d-flex justify-content-between">
