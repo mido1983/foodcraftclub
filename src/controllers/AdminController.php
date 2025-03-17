@@ -73,14 +73,14 @@ class AdminController extends Controller {
         }
         
         // Debug log
-        error_log('User ID ' . $id . ' current roles: ' . print_r($userRoles, true));
+        Application::$app->logger->info('User ID ' . $id . ' current roles: ' . print_r($userRoles, true), [], 'users.log');
         
         // Handle form submission
         if (Application::$app->request->isPost()) {
             $data = Application::$app->request->getBody();
             
             // Debug data received from form
-            error_log('Form data received for user ID ' . $id . ': ' . print_r($data, true));
+            Application::$app->logger->debug('Form data received for user ID ' . $id . ': ' . print_r($data, true), [], 'users.log');
             
             // Validate input
             $errors = $this->validateUserEdit($data, $user);
@@ -90,10 +90,31 @@ class AdminController extends Controller {
                 $user->email = $data['email'];
                 $user->full_name = $data['full_name'];
                 
-                // Ensure status is properly set
+                // Улучшенная обработка статуса с подробной отладкой
+                $oldStatus = $user->status;
                 if (isset($data['status']) && in_array($data['status'], ['active', 'pending', 'suspended'])) {
                     $user->status = $data['status'];
-                    error_log('Setting status to: ' . $data['status']);
+                    Application::$app->logger->info('Статус пользователя изменен с "' . $oldStatus . '" на "' . $data['status'] . '"', ['user_id' => $user->id], 'status.log');
+                    
+                    // Прямое обновление статуса в базе данных
+                    try {
+                        $directStatusUpdate = $db->prepare("UPDATE users SET status = :status WHERE id = :id");
+                        $directResult = $directStatusUpdate->execute([
+                            'id' => $user->id,
+                            'status' => $data['status']
+                        ]);
+                        Application::$app->logger->info('Прямое обновление статуса: ' . ($directResult ? 'успешно' : 'ошибка'), ['user_id' => $user->id], 'status.log');
+                        
+                        // Проверяем, что статус действительно обновился
+                        $checkStmt = $db->prepare("SELECT status FROM users WHERE id = :id");
+                        $checkStmt->execute(['id' => $user->id]);
+                        $updatedStatus = $checkStmt->fetchColumn();
+                        Application::$app->logger->info('Проверка статуса после прямого обновления: ' . $updatedStatus, ['user_id' => $user->id], 'status.log');
+                    } catch (\Exception $e) {
+                        Application::$app->logger->error('Ошибка при прямом обновлении статуса: ' . $e->getMessage(), ['user_id' => $user->id], 'status.log');
+                    }
+                } else {
+                    Application::$app->logger->error('Ошибка: Неверный статус "' . ($data['status'] ?? 'не указан') . '". Используем текущий статус: "' . $user->status . '"', ['user_id' => $user->id], 'status.log');
                 }
                 
                 // Update password if provided
@@ -108,12 +129,12 @@ class AdminController extends Controller {
                         $selectedRoleId = null;
                         if (isset($data['role']) && is_numeric($data['role'])) {
                             $selectedRoleId = (int)$data['role'];
-                            error_log('Selected role from form: ' . $selectedRoleId);
+                            Application::$app->logger->info('Selected role from form: ' . $selectedRoleId, ['user_id' => $user->id], 'users.log');
                         } else {
-                            error_log('No role selected in form or invalid role');
+                            Application::$app->logger->warning('No role selected in form or invalid role', ['user_id' => $user->id], 'users.log');
                             // Default to client role if none selected
                             $selectedRoleId = 3; // Client role ID
-                            error_log('Using default client role ID: ' . $selectedRoleId);
+                            Application::$app->logger->info('Using default client role ID: ' . $selectedRoleId, ['user_id' => $user->id], 'users.log');
                         }
                         
                         // Update roles directly in the database
@@ -139,24 +160,42 @@ class AdminController extends Controller {
                                 }
                             }
                             
-                            error_log('Role updated successfully in AdminController for user ID: ' . $user->id . ' with role: ' . $roleName);
+                            Application::$app->logger->info('Role updated successfully in AdminController for user ID: ' . $user->id . ' with role: ' . $roleName, [], 'users.log');
                             
-                            Application::$app->session->setFlash('success', 'User updated successfully! Role updated to: ' . $roleName);
+                            // Формируем сообщение об успехе с информацией о роли и статусе
+                            $statusLabel = '';
+                            switch ($user->status) {
+                                case 'active':
+                                    $statusLabel = 'Активный';
+                                    break;
+                                case 'pending':
+                                    $statusLabel = 'Ожидает';
+                                    break;
+                                case 'suspended':
+                                    $statusLabel = 'Заблокирован';
+                                    break;
+                            }
+                            
+                            $successMessage = 'User updated successfully! ' .
+                                             'Role: ' . $roleName . ', ' .
+                                             'Status: ' . $statusLabel;
+                            
+                            Application::$app->session->setFlash('success', $successMessage);
                             return Application::$app->response->redirect('/admin/users');
                         } catch (\Exception $e) {
                             $db->rollBack();
-                            error_log('Error updating role in AdminController: ' . $e->getMessage());
+                            Application::$app->logger->error('Error updating role in AdminController: ' . $e->getMessage(), ['user_id' => $user->id], 'users.log');
                             throw $e;
                         }
                     }
                 } catch (\Exception $e) {
+                    Application::$app->logger->error('Error updating user: ' . $e->getMessage(), ['user_id' => $user->id], 'users.log');
                     Application::$app->session->setFlash('error', 'Failed to update user: ' . $e->getMessage());
-                    error_log('Error updating user: ' . $e->getMessage());
                 }
             } else {
                 // Set errors in session
                 Application::$app->session->setFlash('errors', $errors);
-                error_log('Validation errors: ' . print_r($errors, true));
+                Application::$app->logger->warning('Validation errors: ' . print_r($errors, true), ['user_id' => $user->id], 'users.log');
             }
         }
         
@@ -194,6 +233,7 @@ class AdminController extends Controller {
                 Application::$app->session->setFlash('error', 'Failed to delete user');
             }
         } catch (\Exception $e) {
+            Application::$app->logger->error('Error deleting user: ' . $e->getMessage(), ['user_id' => $id], 'users.log');
             Application::$app->session->setFlash('error', 'Error deleting user: ' . $e->getMessage());
         }
         
@@ -225,15 +265,15 @@ class AdminController extends Controller {
                 ");
                 $stmt->execute(['user_id' => $userId]);
                 
-                error_log("Cleared cache for user ID: {$userId}");
+                Application::$app->logger->info("Cleared cache for user ID: {$userId}", [], 'cache.log');
             }
             
             // Log cache clearing
-            error_log('Cache cleared successfully');
+            Application::$app->logger->info('Cache cleared successfully', [], 'cache.log');
             
             Application::$app->session->setFlash('success', 'Cache cleared successfully!');
         } catch (\Exception $e) {
-            error_log('Error clearing cache: ' . $e->getMessage());
+            Application::$app->logger->error('Error clearing cache: ' . $e->getMessage(), [], 'cache.log');
             Application::$app->session->setFlash('error', 'Failed to clear cache: ' . $e->getMessage());
         }
         
