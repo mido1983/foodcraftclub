@@ -45,12 +45,13 @@ use App\Core\Application;
                         <div class="form-check">
                             <input class="form-check-input" type="checkbox" name="roles[]" 
                                    value="<?= $role['id'] ?>" id="role_<?= $role['id'] ?>"
-                                   <?= in_array($role['id'], $userRoles) ? 'checked' : '' ?>>
+                                   <?= in_array((int)$role['id'], $userRoles) ? 'checked' : '' ?>>
                             <label class="form-check-label" for="role_<?= $role['id'] ?>">
                                 <?= htmlspecialchars($role['name']) ?>
                             </label>
                         </div>
                     <?php endforeach; ?>
+                    <div class="form-text text-muted">At least one role must be selected. If none is selected, Client will be assigned by default.</div>
                 </div>
 
                 <div class="mb-3">

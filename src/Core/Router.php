@@ -30,6 +30,12 @@ class Router {
         $path = $this->request->getPath();
         $method = $this->request->getMethod();
         
+        // Run global middlewares first - BEFORE any route matching
+        // This ensures security checks happen before any controller is instantiated
+        foreach ($this->middlewares as $middleware) {
+            $middleware($this->request, $this->response);
+        }
+        
         // Check for exact match first
         $callback = $this->routes[$method][$path] ?? false;
         $params = [];
@@ -52,11 +58,6 @@ class Router {
             return $this->renderView('_404');
         }
 
-        // Run middlewares
-        foreach ($this->middlewares as $middleware) {
-            $middleware($this->request, $this->response);
-        }
-
         if (is_array($callback)) {
             /** @var \App\Core\Controller $controller */
             $controller = new $callback[0]();
@@ -64,6 +65,7 @@ class Router {
             $controller->action = $callback[1];
             $callback[0] = $controller;
 
+            // Execute controller middlewares BEFORE calling the action
             foreach ($controller->getMiddlewares() as $middleware) {
                 $middleware->execute();
             }

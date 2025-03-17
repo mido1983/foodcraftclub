@@ -100,13 +100,21 @@ class AuthController extends Controller {
                 
                 try {
                     if ($user->save()) {
-                        // Get selected roles from the form or default to client
-                        $selectedRoles = isset($data['roles']) && is_array($data['roles']) 
-                            ? $data['roles'] 
-                            : [3]; // Default to client role (ID: 3)
+                        // Get selected roles from the form
+                        $selectedRoles = [];
+                        if (isset($data['roles']) && is_array($data['roles'])) {
+                            // Convert role IDs to integers
+                            $selectedRoles = array_map('intval', $data['roles']);
+                        }
+                        
+                        // If no roles selected, default to client role
+                        if (empty($selectedRoles)) {
+                            $selectedRoles = [3]; // Client role ID
+                        }
                         
                         // Make sure we have the user ID before setting roles
                         if ($user->id) {
+                            // Always set roles to ensure they're properly assigned
                             $user->setRoles($selectedRoles);
                             
                             Application::$app->session->setFlash('success', 'User created successfully!');

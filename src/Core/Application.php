@@ -3,6 +3,7 @@
 namespace App\Core;
 
 use App\Core\Exception\ForbiddenException;
+use App\Core\Middleware\AdminRouteMiddleware;
 
 class Application {
     public static Application $app;
@@ -22,6 +23,9 @@ class Application {
         $this->db = new Database(); // Initialize database first
         $this->session = new Session(); // Then initialize session
         $this->view = new View();
+        
+        // Register global middlewares
+        $this->router->middleware(new AdminRouteMiddleware());
     }
 
     public function run() {

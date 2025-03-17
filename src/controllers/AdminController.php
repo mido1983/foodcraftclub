@@ -6,6 +6,7 @@ use App\Core\Controller;
 use App\Core\Application;
 use App\Core\Middleware\AuthMiddleware;
 use App\Models\User;
+use PDO;
 
 class AdminController extends Controller {
     public function __construct() {
@@ -54,11 +55,17 @@ class AdminController extends Controller {
         
         // Get user roles
         $userRoles = $user->getRoles();
-        $roleIds = array_column($userRoles, 'id');
+        // Extract just the IDs from the roles array for comparison
+        $roleIds = array_map(function($role) {
+            return (int)$role['id'];
+        }, $userRoles);
         
         // Handle form submission
         if (Application::$app->request->isPost()) {
             $data = Application::$app->request->getBody();
+            
+            // Debug data received from form
+            error_log('Form data received: ' . print_r($data, true));
             
             // Validate input
             $errors = $this->validateUserEdit($data, $user);
@@ -67,7 +74,11 @@ class AdminController extends Controller {
                 // Update user data
                 $user->email = $data['email'];
                 $user->full_name = $data['full_name'];
-                $user->status = $data['status'] ?? 'active';
+                
+                // Ensure status is properly set
+                if (isset($data['status']) && in_array($data['status'], ['active', 'pending', 'suspended'])) {
+                    $user->status = $data['status'];
+                }
                 
                 // Update password if provided
                 if (!empty($data['password']) && $data['password'] === $data['password_confirm']) {
@@ -75,15 +86,48 @@ class AdminController extends Controller {
                 }
                 
                 try {
+                    // Update user data in the database
                     if ($user->save()) {
-                        // Update roles if changed
-                        $selectedRoles = isset($data['roles']) && is_array($data['roles']) 
-                            ? $data['roles'] 
-                            : [];
+                        // Get selected roles from the form
+                        $selectedRoles = [];
+                        if (isset($data['roles']) && is_array($data['roles'])) {
+                            // Convert role IDs to integers
+                            foreach ($data['roles'] as $roleId) {
+                                $selectedRoles[] = (int)$roleId;
+                            }
+                        }
+                        
+                        // If no roles selected, default to client role
+                        if (empty($selectedRoles)) {
+                            $selectedRoles = [3]; // Client role ID
+                        }
+                        
+                        error_log('Selected roles before setting: ' . implode(', ', $selectedRoles));
+                        
+                        // Update roles directly in the database
+                        $db = Application::$app->db;
+                        try {
+                            $db->beginTransaction();
                             
-                        // Only update roles if they've changed
-                        if (array_diff($selectedRoles, $roleIds) || array_diff($roleIds, $selectedRoles)) {
-                            $user->setRoles($selectedRoles);
+                            // Delete existing roles
+                            $stmt = $db->prepare("DELETE FROM user_roles WHERE user_id = :user_id");
+                            $stmt->execute(['user_id' => $user->id]);
+                            
+                            // Insert new roles
+                            foreach ($selectedRoles as $roleId) {
+                                $stmt = $db->prepare("INSERT INTO user_roles (user_id, role_id) VALUES (:user_id, :role_id)");
+                                $stmt->execute([
+                                    'user_id' => $user->id,
+                                    'role_id' => $roleId
+                                ]);
+                            }
+                            
+                            $db->commit();
+                            error_log('Roles updated successfully in AdminController for user ID: ' . $user->id);
+                        } catch (\Exception $e) {
+                            $db->rollBack();
+                            error_log('Error updating roles in AdminController: ' . $e->getMessage());
+                            throw $e;
                         }
                         
                         Application::$app->session->setFlash('success', 'User updated successfully!');
@@ -177,7 +221,14 @@ class AdminController extends Controller {
         $db = Application::$app->db;
         $statement = $db->prepare("SELECT * FROM roles ORDER BY name");
         $statement->execute();
-        return $statement->fetchAll();
+        $roles = $statement->fetchAll(PDO::FETCH_ASSOC);
+        
+        // Ensure role IDs are integers
+        foreach ($roles as &$role) {
+            $role['id'] = (int)$role['id'];
+        }
+        
+        return $roles;
     }
     
     private function getUserCount(): int {

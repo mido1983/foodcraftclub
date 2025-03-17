@@ -23,13 +23,19 @@ class User {
                     full_name = :full_name, status = :status 
                 WHERE id = :id
             ");
-            return $statement->execute([
+            $result = $statement->execute([
                 'id' => $this->id,
                 'email' => $this->email,
                 'password_hash' => $this->password_hash,
                 'full_name' => $this->full_name,
                 'status' => $this->status
             ]);
+            
+            // Debug log
+            error_log("User update result: " . ($result ? 'success' : 'failed') . " for user ID: {$this->id}");
+            error_log("Updated status to: {$this->status}");
+            
+            return $result;
         }
 
         // Insert
@@ -60,31 +66,51 @@ class User {
         }
     }
 
-    public function setRoles(array $roles): void {
+    public function setRoles(array $roleIds): void {
         $db = Application::$app->db;
+        
+        // Ensure at least one role is selected (default to Client role if none)
+        if (empty($roleIds)) {
+            $roleIds = [3]; // Default to Client role (ID: 3)
+        }
+        
+        // Ensure all role IDs are integers
+        $roleIds = array_map(function($id) {
+            return (int)$id;
+        }, $roleIds);
+        
+        // Debug log
+        error_log('Setting roles for user ID ' . $this->id . ': ' . implode(', ', $roleIds));
+        
         try {
             $db->beginTransaction();
 
             // Delete existing roles
             $statement = $db->prepare("DELETE FROM user_roles WHERE user_id = :user_id");
             $statement->execute(['user_id' => $this->id]);
+            error_log('Deleted existing roles for user ID: ' . $this->id);
 
             // Insert new roles
-            foreach ($roles as $roleId) {
+            foreach ($roleIds as $roleId) {
                 $statement = $db->prepare("
                     INSERT INTO user_roles (user_id, role_id)
                     VALUES (:user_id, :role_id)
                 ");
-                $statement->execute([
+                $result = $statement->execute([
                     'user_id' => $this->id,
                     'role_id' => $roleId
                 ]);
+                error_log('Added role ID ' . $roleId . ' for user ID ' . $this->id . ': ' . ($result ? 'success' : 'failed'));
             }
 
             $db->commit();
-            $this->roles = $roles;
+            error_log('Committed role changes for user ID: ' . $this->id);
+            
+            // Clear the cached roles so they'll be reloaded on next getRoles() call
+            $this->roles = [];
         } catch (\Exception $e) {
             $db->rollBack();
+            error_log('Error setting roles for user ID ' . $this->id . ': ' . $e->getMessage());
             throw $e;
         }
     }
@@ -98,6 +124,9 @@ class User {
             ");
             $statement->execute(['user_id' => $this->id]);
             $this->roles = $statement->fetchAll(PDO::FETCH_ASSOC);
+            
+            // Debug log
+            error_log('Retrieved roles for user ID ' . $this->id . ': ' . print_r($this->roles, true));
         }
         return $this->roles;
     }

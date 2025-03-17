@@ -42,9 +42,19 @@
                                 <label class="form-check-label" for="role_seller">Seller</label>
                             </div>
                             <div class="form-check">
-                                <input class="form-check-input" type="checkbox" name="roles[]" value="3" id="role_client" checked>
+                                <input class="form-check-input" type="checkbox" name="roles[]" value="3" id="role_client">
                                 <label class="form-check-label" for="role_client">Client</label>
                             </div>
+                            <div class="form-text text-muted">Select at least one role. If none selected, Client will be assigned by default.</div>
+                        </div>
+                        
+                        <div class="mb-3">
+                            <label for="status" class="form-label">Status</label>
+                            <select class="form-select" id="status" name="status">
+                                <option value="active" selected>Active</option>
+                                <option value="pending">Pending</option>
+                                <option value="suspended">Suspended</option>
+                            </select>
                         </div>
 
                         <div class="d-grid gap-2">
