@@ -41,17 +41,43 @@ use App\Core\Application;
 
                 <div class="mb-3">
                     <label class="form-label">User Role</label>
-                    <?php foreach ($allRoles as $role): ?>
+                    <?php 
+                    // Debug user roles
+                    error_log('User roles in view: ' . print_r($userRoles, true));
+                    error_log('All roles in view: ' . print_r($allRoles, true));
+                    ?>
+                    
+                    <!-- Отладочная информация -->
+                    <div class="alert alert-info mb-2">
+                        <strong>Отладка:</strong> Текущие роли: 
+                        <?php foreach ($userRoles as $role): ?>
+                            <span class="badge bg-primary"><?= htmlspecialchars($role['name']) ?> (ID: <?= $role['id'] ?>)</span>
+                        <?php endforeach; ?>
+                    </div>
+                    
+                    <!-- Радио-кнопки вместо чекбоксов -->
+                    <?php foreach ($allRoles as $role): 
+                        $roleId = (int)$role['id'];
+                        
+                        // Check if user has this role
+                        $isChecked = false;
+                        foreach ($userRoles as $userRole) {
+                            if ((int)$userRole['id'] === $roleId) {
+                                $isChecked = true;
+                                break;
+                            }
+                        }
+                    ?>
                         <div class="form-check">
-                            <input class="form-check-input" type="checkbox" name="roles[]" 
-                                   value="<?= $role['id'] ?>" id="role_<?= $role['id'] ?>"
-                                   <?= in_array((int)$role['id'], $userRoles) ? 'checked' : '' ?>>
-                            <label class="form-check-label" for="role_<?= $role['id'] ?>">
-                                <?= htmlspecialchars($role['name']) ?>
+                            <input class="form-check-input" type="radio" name="role" 
+                                   value="<?= $roleId ?>" id="role_<?= $roleId ?>" 
+                                   <?= $isChecked ? 'checked' : '' ?>>
+                            <label class="form-check-label" for="role_<?= $roleId ?>">
+                                <?= htmlspecialchars($role['name']) ?> (ID: <?= $roleId ?>)
                             </label>
                         </div>
                     <?php endforeach; ?>
-                    <div class="form-text text-muted">At least one role must be selected. If none is selected, Client will be assigned by default.</div>
+                    <div class="form-text text-muted">Выберите основную роль пользователя.</div>
                 </div>
 
                 <div class="mb-3">

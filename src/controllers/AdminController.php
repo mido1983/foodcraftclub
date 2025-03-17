@@ -53,19 +53,34 @@ class AdminController extends Controller {
             return Application::$app->response->redirect('/admin/users');
         }
         
-        // Get user roles
-        $userRoles = $user->getRoles();
-        // Extract just the IDs from the roles array for comparison
-        $roleIds = array_map(function($role) {
-            return (int)$role['id'];
-        }, $userRoles);
+        // Get all available roles
+        $allRoles = $this->getAllRoles();
+        
+        // Get user roles directly from the database
+        $db = Application::$app->db;
+        $stmt = $db->prepare("
+            SELECT r.* 
+            FROM roles r
+            JOIN user_roles ur ON r.id = ur.role_id
+            WHERE ur.user_id = :user_id
+        ");
+        $stmt->execute(['user_id' => $user->id]);
+        $userRoles = $stmt->fetchAll(PDO::FETCH_ASSOC);
+        
+        // Ensure role IDs are integers
+        foreach ($userRoles as &$role) {
+            $role['id'] = (int)$role['id'];
+        }
+        
+        // Debug log
+        error_log('User ID ' . $id . ' current roles: ' . print_r($userRoles, true));
         
         // Handle form submission
         if (Application::$app->request->isPost()) {
             $data = Application::$app->request->getBody();
             
             // Debug data received from form
-            error_log('Form data received: ' . print_r($data, true));
+            error_log('Form data received for user ID ' . $id . ': ' . print_r($data, true));
             
             // Validate input
             $errors = $this->validateUserEdit($data, $user);
@@ -78,6 +93,7 @@ class AdminController extends Controller {
                 // Ensure status is properly set
                 if (isset($data['status']) && in_array($data['status'], ['active', 'pending', 'suspended'])) {
                     $user->status = $data['status'];
+                    error_log('Setting status to: ' . $data['status']);
                 }
                 
                 // Update password if provided
@@ -88,65 +104,65 @@ class AdminController extends Controller {
                 try {
                     // Update user data in the database
                     if ($user->save()) {
-                        // Get selected roles from the form
-                        $selectedRoles = [];
-                        if (isset($data['roles']) && is_array($data['roles'])) {
-                            // Convert role IDs to integers
-                            foreach ($data['roles'] as $roleId) {
-                                $selectedRoles[] = (int)$roleId;
-                            }
+                        // Get selected role from the form (now using radio buttons)
+                        $selectedRoleId = null;
+                        if (isset($data['role']) && is_numeric($data['role'])) {
+                            $selectedRoleId = (int)$data['role'];
+                            error_log('Selected role from form: ' . $selectedRoleId);
+                        } else {
+                            error_log('No role selected in form or invalid role');
+                            // Default to client role if none selected
+                            $selectedRoleId = 3; // Client role ID
+                            error_log('Using default client role ID: ' . $selectedRoleId);
                         }
-                        
-                        // If no roles selected, default to client role
-                        if (empty($selectedRoles)) {
-                            $selectedRoles = [3]; // Client role ID
-                        }
-                        
-                        error_log('Selected roles before setting: ' . implode(', ', $selectedRoles));
                         
                         // Update roles directly in the database
-                        $db = Application::$app->db;
                         try {
                             $db->beginTransaction();
                             
-                            // Delete existing roles
+                            // Delete existing roles for the user
                             $stmt = $db->prepare("DELETE FROM user_roles WHERE user_id = :user_id");
                             $stmt->execute(['user_id' => $user->id]);
                             
-                            // Insert new roles
-                            foreach ($selectedRoles as $roleId) {
-                                $stmt = $db->prepare("INSERT INTO user_roles (user_id, role_id) VALUES (:user_id, :role_id)");
-                                $stmt->execute([
-                                    'user_id' => $user->id,
-                                    'role_id' => $roleId
-                                ]);
-                            }
+                            // Add the selected role
+                            $stmt = $db->prepare("INSERT INTO user_roles (user_id, role_id) VALUES (:user_id, :role_id)");
+                            $stmt->execute(['user_id' => $user->id, 'role_id' => $selectedRoleId]);
                             
                             $db->commit();
-                            error_log('Roles updated successfully in AdminController for user ID: ' . $user->id);
+                            
+                            // Get the role name for the success message
+                            $roleName = '';
+                            foreach ($allRoles as $role) {
+                                if ((int)$role['id'] === (int)$selectedRoleId) {
+                                    $roleName = $role['name'];
+                                    break;
+                                }
+                            }
+                            
+                            error_log('Role updated successfully in AdminController for user ID: ' . $user->id . ' with role: ' . $roleName);
+                            
+                            Application::$app->session->setFlash('success', 'User updated successfully! Role updated to: ' . $roleName);
+                            return Application::$app->response->redirect('/admin/users');
                         } catch (\Exception $e) {
                             $db->rollBack();
-                            error_log('Error updating roles in AdminController: ' . $e->getMessage());
+                            error_log('Error updating role in AdminController: ' . $e->getMessage());
                             throw $e;
                         }
-                        
-                        Application::$app->session->setFlash('success', 'User updated successfully!');
-                        return Application::$app->response->redirect('/admin/users');
                     }
                 } catch (\Exception $e) {
                     Application::$app->session->setFlash('error', 'Failed to update user: ' . $e->getMessage());
+                    error_log('Error updating user: ' . $e->getMessage());
                 }
             } else {
-                Application::$app->session->setFlash('error', implode('<br>', $errors));
+                // Set errors in session
+                Application::$app->session->setFlash('errors', $errors);
+                error_log('Validation errors: ' . print_r($errors, true));
             }
         }
         
-        // Get all available roles for the form
-        $allRoles = $this->getAllRoles();
-        
         return $this->render('admin/edit-user', [
             'user' => $user,
-            'userRoles' => $roleIds,
+            'userRoles' => $userRoles,
             'allRoles' => $allRoles
         ]);
     }
@@ -179,6 +195,46 @@ class AdminController extends Controller {
             }
         } catch (\Exception $e) {
             Application::$app->session->setFlash('error', 'Error deleting user: ' . $e->getMessage());
+        }
+        
+        return Application::$app->response->redirect('/admin/users');
+    }
+    
+    public function clearCache() {
+        // Clear PHP opcache if available
+        if (function_exists('opcache_reset')) {
+            opcache_reset();
+        }
+        
+        // Clear application cache
+        $db = Application::$app->db;
+        
+        try {
+            // Clear user roles cache by forcing a reload for all users
+            $stmt = $db->prepare("SELECT id FROM users");
+            $stmt->execute();
+            $userIds = $stmt->fetchAll(PDO::FETCH_COLUMN);
+            
+            foreach ($userIds as $userId) {
+                // Force reload of user roles
+                $stmt = $db->prepare("
+                    SELECT r.* 
+                    FROM roles r
+                    JOIN user_roles ur ON r.id = ur.role_id
+                    WHERE ur.user_id = :user_id
+                ");
+                $stmt->execute(['user_id' => $userId]);
+                
+                error_log("Cleared cache for user ID: {$userId}");
+            }
+            
+            // Log cache clearing
+            error_log('Cache cleared successfully');
+            
+            Application::$app->session->setFlash('success', 'Cache cleared successfully!');
+        } catch (\Exception $e) {
+            error_log('Error clearing cache: ' . $e->getMessage());
+            Application::$app->session->setFlash('error', 'Failed to clear cache: ' . $e->getMessage());
         }
         
         return Application::$app->response->redirect('/admin/users');

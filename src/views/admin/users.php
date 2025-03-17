@@ -7,10 +7,15 @@ use App\Core\Application;
 
 <div class="container admin-dashboard py-4">
     <div class="d-flex justify-content-between align-items-center mb-4">
-        <h1 class="mb-0">Manage Users</h1>
-        <a href="/admin/users/create" class="btn btn-primary">
-            <i class="bi bi-person-plus"></i> Create User
-        </a>
+        <h1 class="mb-0">Users</h1>
+        <div>
+            <a href="/admin/users/create" class="btn btn-primary">
+                <i class="bi bi-plus"></i> Add New User
+            </a>
+            <a href="/admin/clear-cache" class="btn btn-warning ms-2">
+                <i class="bi bi-trash"></i> Clear Cache
+            </a>
+        </div>
     </div>
 
     <div class="card">

@@ -125,6 +125,11 @@ class User {
             $statement->execute(['user_id' => $this->id]);
             $this->roles = $statement->fetchAll(PDO::FETCH_ASSOC);
             
+            // Ensure role IDs are integers
+            foreach ($this->roles as &$role) {
+                $role['id'] = (int)$role['id'];
+            }
+            
             // Debug log
             error_log('Retrieved roles for user ID ' . $this->id . ': ' . print_r($this->roles, true));
         }
@@ -157,5 +162,13 @@ class User {
 
     public function setPassword(string $password): void {
         $this->password_hash = password_hash($password, PASSWORD_DEFAULT);
+    }
+
+    /**
+     * Clear the cached roles to force a fresh load from the database
+     */
+    public function clearRolesCache(): void {
+        $this->roles = [];
+        error_log('Cleared roles cache for user ID: ' . $this->id);
     }
 }
