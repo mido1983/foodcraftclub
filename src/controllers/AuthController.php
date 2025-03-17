@@ -21,10 +21,24 @@ class AuthController extends Controller {
             $email = Application::$app->request->getBody()['email'] ?? '';
             $password = Application::$app->request->getBody()['password'] ?? '';
             
+            // Debug logging
+            error_log("Login attempt for email: {$email}");
+            
             $user = User::findOne(['email' => $email]);
             
+            if (!$user) {
+                error_log("User not found with email: {$email}");
+                Application::$app->session->setFlash('error', 'Invalid email or password');
+                return $this->render('auth/login');
+            }
+            
+            error_log("User found, verifying password for: {$email}");
+            
             if ($user && $user->verifyPassword($password)) {
+                error_log("Password verified for: {$email}");
+                
                 if ($user->status !== 'active') {
+                    error_log("User account not active: {$email}, status: {$user->status}");
                     Application::$app->session->setFlash('error', 'Your account is not active');
                     return $this->render('auth/login');
                 }
@@ -32,14 +46,23 @@ class AuthController extends Controller {
                 Application::$app->session->setUser($user);
                 Application::$app->session->setFlash('success', 'Welcome back!');
                 
+                // Get user roles for debugging
+                $roles = $user->getRoles();
+                error_log("User roles: " . json_encode($roles));
+                
                 // Redirect based on role
                 if ($user->hasRole('admin')) {
+                    error_log("Redirecting admin user to /admin");
                     return Application::$app->response->redirect('/admin');
                 } elseif ($user->hasRole('seller')) {
+                    error_log("Redirecting seller user to /seller/dashboard");
                     return Application::$app->response->redirect('/seller/dashboard');
                 } else {
+                    error_log("Redirecting regular user to /");
                     return Application::$app->response->redirect('/');
                 }
+            } else {
+                error_log("Password verification failed for: {$email}");
             }
             
             Application::$app->session->setFlash('error', 'Invalid email or password');
@@ -54,6 +77,12 @@ class AuthController extends Controller {
     }
     
     public function register() {
+        // Only admin can access this page
+        if (!Application::$app->session->hasRole('admin')) {
+            Application::$app->session->setFlash('error', 'You do not have permission to access this page');
+            return Application::$app->response->redirect('/');
+        }
+        
         $this->view->title = 'Create New User';
         
         if (Application::$app->request->isPost()) {
@@ -76,13 +105,20 @@ class AuthController extends Controller {
                             ? $data['roles'] 
                             : [3]; // Default to client role (ID: 3)
                         
-                        $user->setRoles($selectedRoles);
-                        
-                        Application::$app->session->setFlash('success', 'User created successfully!');
-                        return Application::$app->response->redirect('/admin/users');
+                        // Make sure we have the user ID before setting roles
+                        if ($user->id) {
+                            $user->setRoles($selectedRoles);
+                            
+                            Application::$app->session->setFlash('success', 'User created successfully!');
+                            return Application::$app->response->redirect('/admin/users');
+                        } else {
+                            Application::$app->session->setFlash('error', 'Failed to create user: Could not get user ID');
+                        }
+                    } else {
+                        Application::$app->session->setFlash('error', 'Failed to save user to database');
                     }
                 } catch (\Exception $e) {
-                    Application::$app->session->setFlash('error', 'Failed to create user. Please try again.');
+                    Application::$app->session->setFlash('error', 'Failed to create user: ' . $e->getMessage());
                 }
             } else {
                 Application::$app->session->setFlash('error', implode('<br>', $errors));
@@ -106,8 +142,12 @@ class AuthController extends Controller {
             $errors[] = 'Email is required';
         } elseif (!filter_var($data['email'], FILTER_VALIDATE_EMAIL)) {
             $errors[] = 'Invalid email format';
-        } elseif (User::findOne(['email' => $data['email']])) {
-            $errors[] = 'Email already exists';
+        } else {
+            // Check if email already exists
+            $existingUser = User::findOne(['email' => $data['email']]);
+            if ($existingUser !== null) {
+                $errors[] = 'Email already exists';
+            }
         }
         
         // Password validation
@@ -122,12 +162,6 @@ class AuthController extends Controller {
         // Full name validation
         if (empty($data['full_name'])) {
             $errors[] = 'Full name is required';
-        }
-        
-        // Status validation
-        $validStatuses = ['active', 'pending', 'suspended'];
-        if (!empty($data['status']) && !in_array($data['status'], $validStatuses)) {
-            $errors[] = 'Invalid status selected';
         }
         
         return $errors;

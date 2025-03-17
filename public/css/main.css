@@ -74,6 +74,95 @@ h1, h2, h3, h4, h5, h6 {
     color: #7f8c8d;
 }
 
+/* Admin Dashboard Styles */
+.admin-dashboard .card {
+    border-radius: 10px;
+    margin-bottom: 20px;
+    box-shadow: 0 4px 10px rgba(0, 0, 0, 0.1);
+}
+
+.admin-dashboard .card-header {
+    font-weight: 600;
+    background-color: rgba(0, 0, 0, 0.03);
+    border-bottom: 1px solid rgba(0, 0, 0, 0.125);
+}
+
+.admin-dashboard .display-4 {
+    font-size: 2.5rem;
+    font-weight: 700;
+}
+
+.admin-dashboard .bg-primary {
+    background-color: #3498db !important;
+}
+
+.admin-dashboard .bg-success {
+    background-color: #2ecc71 !important;
+}
+
+.admin-dashboard .bg-info {
+    background-color: #1abc9c !important;
+}
+
+.admin-dashboard .list-group-item {
+    border: none;
+    padding: 12px 20px;
+    margin-bottom: 5px;
+    background-color: #f8f9fa;
+    border-radius: 5px;
+    transition: all 0.2s;
+}
+
+.admin-dashboard .list-group-item:hover {
+    background-color: #e9ecef;
+    transform: translateX(5px);
+}
+
+.admin-dashboard .bi {
+    margin-right: 8px;
+}
+
+/* Table Styles */
+.table-responsive {
+    border-radius: 10px;
+    overflow: hidden;
+}
+
+.table {
+    margin-bottom: 0;
+}
+
+.table th {
+    background-color: #f8f9fa;
+    border-top: none;
+    font-weight: 600;
+    text-transform: uppercase;
+    font-size: 0.8rem;
+    letter-spacing: 0.5px;
+}
+
+.table td {
+    vertical-align: middle;
+}
+
+.table-hover tbody tr:hover {
+    background-color: rgba(0, 123, 255, 0.05);
+}
+
+/* Badge Styles */
+.badge {
+    padding: 0.5em 0.8em;
+    font-weight: 500;
+    border-radius: 30px;
+}
+
+/* Button Group Styles */
+.btn-group-sm > .btn {
+    padding: 0.25rem 0.5rem;
+    font-size: 0.875rem;
+    border-radius: 0.2rem;
+}
+
 /* Responsive adjustments */
 @media (max-width: 768px) {
     .container {

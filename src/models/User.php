@@ -116,7 +116,10 @@ class User {
             $statement->bindValue(":$key", $item);
         }
         $statement->execute();
-        return $statement->fetchObject(static::class);
+        $result = $statement->fetchObject(static::class);
+        
+        // Return null instead of false when no record is found
+        return $result === false ? null : $result;
     }
 
     public function verifyPassword(string $password): bool {

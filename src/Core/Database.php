@@ -4,6 +4,7 @@ namespace App\Core;
 
 use PDO;
 use PDOException;
+use PDOStatement;
 
 class Database {
     private PDO $pdo;
@@ -24,6 +25,36 @@ class Database {
         } catch (PDOException $e) {
             throw new \Exception("Database connection failed: " . $e->getMessage());
         }
+    }
+
+    /**
+     * Get a PDO attribute
+     * 
+     * @param int $attribute The attribute to get (PDO::ATTR_* constant)
+     * @return mixed The attribute value
+     */
+    public function getAttribute(int $attribute) {
+        return $this->pdo->getAttribute($attribute);
+    }
+
+    /**
+     * Returns the ID of the last inserted row or sequence value
+     * 
+     * @param string|null $name Name of the sequence object from which the ID should be returned
+     * @return string The last insert ID
+     */
+    public function lastInsertId(?string $name = null): string {
+        return $this->pdo->lastInsertId($name);
+    }
+
+    /**
+     * Prepares a statement for execution and returns a statement object
+     * 
+     * @param string $sql SQL statement to prepare
+     * @return PDOStatement The prepared statement
+     */
+    public function prepare(string $sql): PDOStatement {
+        return $this->pdo->prepare($sql);
     }
 
     public function applyMigrations() {
@@ -87,23 +118,34 @@ class Database {
         $statement->execute(['migration' => $migration]);
     }
 
-    public function prepare($sql) {
-        return $this->pdo->prepare($sql);
+    /**
+     * Begin a transaction
+     * 
+     * @return bool TRUE on success or FALSE on failure
+     */
+    public function beginTransaction(): bool {
+        return $this->pdo->beginTransaction();
+    }
+
+    /**
+     * Commit a transaction
+     * 
+     * @return bool TRUE on success or FALSE on failure
+     */
+    public function commit(): bool {
+        return $this->pdo->commit();
+    }
+
+    /**
+     * Roll back a transaction
+     * 
+     * @return bool TRUE on success or FALSE on failure
+     */
+    public function rollBack(): bool {
+        return $this->pdo->rollBack();
     }
 
     protected function log($message) {
         echo '[' . date('Y-m-d H:i:s') . '] - ' . $message . PHP_EOL;
-    }
-
-    public function beginTransaction() {
-        return $this->pdo->beginTransaction();
-    }
-
-    public function commit() {
-        return $this->pdo->commit();
-    }
-
-    public function rollBack() {
-        return $this->pdo->rollBack();
     }
 }

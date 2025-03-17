@@ -19,8 +19,8 @@ class Application {
         $this->request = new Request();
         $this->response = new Response();
         $this->router = new Router($this->request, $this->response);
-        $this->session = new Session();
-        $this->db = new Database();
+        $this->db = new Database(); // Initialize database first
+        $this->session = new Session(); // Then initialize session
         $this->view = new View();
     }
 

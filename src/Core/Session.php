@@ -63,6 +63,15 @@ class Session {
     public function getUser(): ?User {
         return $this->user;
     }
+    
+    /**
+     * Get the ID of the currently logged-in user
+     * 
+     * @return int|null The user ID or null if no user is logged in
+     */
+    public function getUserId(): ?int {
+        return $this->user ? $this->user->id : null;
+    }
 
     public function setRoles(array $roles) {
         $this->set(self::ROLES_KEY, array_column($roles, 'name'));
