@@ -1,5 +1,6 @@
 <?php
 /** @var Exception $exception */
+use App\Core\Application;
 ?>
 
 <div class="container text-center py-5">

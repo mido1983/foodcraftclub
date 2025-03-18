@@ -26,6 +26,63 @@ class Router {
         return $this;
     }
 
+    /**
+     * Получить все зарегистрированные маршруты
+     * 
+     * @return array
+     */
+    public function getRoutes(): array {
+        return $this->routes;
+    }
+
+    /**
+     * Проверить, соответствует ли маршрут пути
+     * 
+     * @param string $route
+     * @param string $path
+     * @return bool
+     */
+    public function matchRoute(string $route, string $path): bool {
+        if ($route === $path) {
+            return true;
+        }
+        
+        $routePattern = $this->convertRouteToRegex($route);
+        return (bool) preg_match($routePattern, $path);
+    }
+
+    /**
+     * Найти подходящий маршрут для пути и метода
+     * 
+     * @param string $path
+     * @param string $method
+     * @return array|null
+     */
+    public function findMatchingRoute(string $path, string $method): ?array {
+        // Приводим метод к нижнему регистру для соответствия ключам в массиве routes
+        $method = strtolower($method);
+        
+        // Проверяем точное совпадение
+        if (isset($this->routes[$method][$path])) {
+            return [
+                'callback' => $this->routes[$method][$path],
+                'params' => []
+            ];
+        }
+        
+        // Проверяем динамические маршруты
+        foreach ($this->routes[$method] ?? [] as $route => $handler) {
+            if ($this->matchRoute($route, $path)) {
+                return [
+                    'callback' => $handler,
+                    'params' => $this->extractParams($route, $path)
+                ];
+            }
+        }
+        
+        return null;
+    }
+
     public function resolve() {
         $path = $this->request->getPath();
         $method = $this->request->getMethod();

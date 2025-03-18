@@ -57,6 +57,51 @@ class Database {
         return $this->pdo->prepare($sql);
     }
 
+    /**
+     * Begins a transaction
+     * 
+     * @return bool TRUE on success or FALSE on failure
+     */
+    public function beginTransaction(): bool {
+        return $this->pdo->beginTransaction();
+    }
+
+    /**
+     * Commits a transaction
+     * 
+     * @return bool TRUE on success or FALSE on failure
+     */
+    public function commit(): bool {
+        return $this->pdo->commit();
+    }
+
+    /**
+     * Rolls back a transaction
+     * 
+     * @return bool TRUE on success or FALSE on failure
+     */
+    public function rollBack(): bool {
+        return $this->pdo->rollBack();
+    }
+
+    /**
+     * Checks if inside a transaction
+     * 
+     * @return bool TRUE if a transaction is currently active, and FALSE if not
+     */
+    public function inTransaction(): bool {
+        return $this->pdo->inTransaction();
+    }
+
+    /**
+     * Returns error information associated with the last operation on the database handle
+     * 
+     * @return array Error information
+     */
+    public function errorInfo(): array {
+        return $this->pdo->errorInfo();
+    }
+
     public function applyMigrations() {
         // Create migrations table if not exists
         $this->createMigrationsTable();
@@ -116,33 +161,6 @@ class Database {
     protected function saveMigration($migration) {
         $statement = $this->pdo->prepare("INSERT INTO migrations (migration) VALUES (:migration)");
         $statement->execute(['migration' => $migration]);
-    }
-
-    /**
-     * Begin a transaction
-     * 
-     * @return bool TRUE on success or FALSE on failure
-     */
-    public function beginTransaction(): bool {
-        return $this->pdo->beginTransaction();
-    }
-
-    /**
-     * Commit a transaction
-     * 
-     * @return bool TRUE on success or FALSE on failure
-     */
-    public function commit(): bool {
-        return $this->pdo->commit();
-    }
-
-    /**
-     * Roll back a transaction
-     * 
-     * @return bool TRUE on success or FALSE on failure
-     */
-    public function rollBack(): bool {
-        return $this->pdo->rollBack();
     }
 
     protected function log($message) {
