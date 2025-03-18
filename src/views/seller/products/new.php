@@ -68,8 +68,8 @@
                         
                         <div class="mb-3">
                             <label for="productImage" class="form-label">Изображение продукта</label>
-                            <input type="file" class="form-control" id="productImage" name="image" accept="image/*">
-                            <div class="form-text">Загрузите изображение продукта (JPG, PNG, GIF, макс. размер 2MB)</div>
+                            <input type="file" class="form-control" id="productImage" name="image" accept="image/avif,image/webp">
+                            <div class="form-text">Загрузите изображение продукта (только AVIF или WebP, макс. размер 100KB)</div>
                         </div>
                         
                         <div class="mb-3">
@@ -131,17 +131,17 @@ document.addEventListener('DOMContentLoaded', function() {
         
         // Проверка файла изображения, если он был выбран
         if (image) {
-            const allowedTypes = ['image/jpeg', 'image/png', 'image/gif'];
-            const maxSize = 2 * 1024 * 1024; // 2MB
+            const allowedTypes = ['image/avif', 'image/webp'];
+            const maxSize = 100 * 1024; // 100KB
             
             if (!allowedTypes.includes(image.type)) {
                 isValid = false;
-                alert('Пожалуйста, загрузите изображение в формате JPG, PNG или GIF');
+                alert('Пожалуйста, загрузите изображение в формате AVIF или WebP');
             }
             
             if (image.size > maxSize) {
                 isValid = false;
-                alert('Размер изображения не должен превышать 2MB');
+                alert('Размер изображения не должен превышать 100KB');
             }
         }
         

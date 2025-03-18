@@ -1,0 +1,61 @@
+# Environment variables
+.env
+.env.*
+!.env.example
+
+# Composer dependencies
+/vendor/
+composer.phar
+
+# IDE and editor files
+.idea/
+.vscode/
+*.sublime-project
+*.sublime-workspace
+*.swp
+*.swo
+*~
+
+# Cache and logs
+/logs/
+/cache/
+*.log
+
+# User uploaded content
+/public/uploads/
+
+# Build assets
+/node_modules/
+/public/build/
+/public/hot
+
+# OS generated files
+.DS_Store
+.DS_Store?
+Thumbs.db
+ehthumbs.db
+desktop.ini
+
+# Temporary files
+*.tmp
+*.bak
+*.swp
+*.swo
+
+# Database dumps and backups
+*.sql
+*.sqlite
+*.sqlite3
+*.db
+database/backups/
+
+# Session files
+/sessions/
+
+# Testing and coverage reports
+/coverage/
+/phpunit.xml
+/.phpunit.result.cache
+
+# Application specific
+/storage/*.key

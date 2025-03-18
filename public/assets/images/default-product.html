@@ -1,0 +1,60 @@
+<!DOCTYPE html>
+<html>
+<head>
+    <title>Default Product Image Generator</title>
+    <style>
+        body {
+            margin: 0;
+            padding: 0;
+            display: flex;
+            justify-content: center;
+            align-items: center;
+            height: 100vh;
+            background-color: #f5f5f5;
+        }
+        .default-image {
+            width: 800px;
+            height: 600px;
+            background-color: #f5f5f5;
+            border: 1px solid #ddd;
+            display: flex;
+            flex-direction: column;
+            justify-content: center;
+            align-items: center;
+            color: #666;
+            font-family: Arial, sans-serif;
+        }
+        .icon {
+            width: 100px;
+            height: 100px;
+            border: 3px solid #999;
+            border-radius: 50%;
+            position: relative;
+            margin-bottom: 20px;
+        }
+        .icon:before, .icon:after {
+            content: '';
+            position: absolute;
+            width: 70%;
+            height: 3px;
+            background-color: #999;
+            top: 50%;
+            left: 15%;
+            transform: rotate(45deg);
+        }
+        .icon:after {
+            transform: rotate(-45deg);
+        }
+        .text {
+            font-size: 20px;
+            text-align: center;
+        }
+    </style>
+</head>
+<body>
+    <div class="default-image">
+        <div class="icon"></div>
+        <div class="text">u0418u0437u043eu0431u0440u0430u0436u0435u043du0438u0435 u043fu0440u043eu0434u0443u043au0442u0430 u043eu0442u0441u0443u0442u0441u0442u0432u0443u0435u0442</div>
+    </div>
+</body>
+</html>

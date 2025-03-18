@@ -19,6 +19,9 @@
             <div class="d-flex justify-content-between flex-wrap flex-md-nowrap align-items-center pt-3 pb-2 mb-3 border-bottom">
                 <h1 class="h2">Мои продукты</h1>
                 <div class="btn-toolbar mb-2 mb-md-0">
+                    <a href="/seller/products/fix-images" class="btn btn-sm btn-outline-secondary me-2">
+                        <i class="bi bi-image"></i> Исправить изображения
+                    </a>
                     <a href="/seller/products/new" class="btn btn-sm btn-outline-primary">
                         <i class="bi bi-plus-circle"></i> Добавить продукт
                     </a>
@@ -52,7 +55,7 @@
                                         <?php if (!empty($product['image_url'])): ?>
                                             <img src="<?= $product['image_url'] ?>" alt="<?= htmlspecialchars($product['product_name']) ?>" width="50">
                                         <?php else: ?>
-                                            <img src="/img/no-image.png" alt="No image" width="50">
+                                            <img src="/assets/images/default-products.svg" alt="<?= htmlspecialchars($product['product_name']) ?>" width="50">
                                         <?php endif; ?>
                                     </td>
                                     <td><?= htmlspecialchars($product['product_name']) ?></td>
@@ -111,16 +114,16 @@
                     <input type="hidden" id="editProductId" name="id">
                     <div class="mb-3">
                         <label for="editProductName" class="form-label">Название продукта</label>
-                        <input type="text" class="form-control" id="editProductName" name="product_name" required>
+                        <input type="text" class="form-control" id="editProductName" name="product_name">
                     </div>
                     <div class="mb-3">
                         <label for="editProductDescription" class="form-label">Описание</label>
-                        <textarea class="form-control" id="editProductDescription" name="description" rows="3" required></textarea>
+                        <textarea class="form-control" id="editProductDescription" name="description" rows="3"></textarea>
                     </div>
                     <div class="row">
                         <div class="col-md-6 mb-3">
                             <label for="editProductPrice" class="form-label">Цена (₽)</label>
-                            <input type="number" class="form-control" id="editProductPrice" name="price" step="0.01" min="0" required>
+                            <input type="number" class="form-control" id="editProductPrice" name="price" step="0.01" min="0">
                         </div>
                         <div class="col-md-6 mb-3">
                             <label for="editProductCategory" class="form-label">Категория</label>
@@ -134,8 +137,8 @@
                     </div>
                     <div class="mb-3">
                         <label for="editProductImage" class="form-label">Изображение продукта</label>
-                        <input type="file" class="form-control" id="editProductImage" name="image">
-                        <div class="form-text">Оставьте пустым, если не хотите менять изображение.</div>
+                        <input type="file" class="form-control" id="editProductImage" name="image" accept="image/avif,image/webp">
+                        <div class="form-text">Загрузите новое изображение (типо AVIF или WebP, макс. размер 100KB) или оставьте пустым, если не хотите менять изображение.</div>
                     </div>
                     <div class="mb-3">
                         <label for="editProductStatus" class="form-label">Статус продукта</label>
@@ -210,6 +213,32 @@
                 document.getElementById('deleteProductId').value = this.dataset.id;
                 document.getElementById('deleteProductName').textContent = this.dataset.name;
             });
+        });
+        
+        // Валидация формы редактирования продукта
+        document.getElementById('editProductForm').addEventListener('submit', function(event) {
+            let isValid = true;
+            const image = document.getElementById('editProductImage').files[0];
+            
+            // Проверка файла изображения, если он был выбран
+            if (image) {
+                const allowedTypes = ['image/avif', 'image/webp'];
+                const maxSize = 100 * 1024; // 100KB
+                
+                if (!allowedTypes.includes(image.type)) {
+                    isValid = false;
+                    alert('Пожалуйста, загрузите изображение в формате AVIF или WebP');
+                }
+                
+                if (image.size > maxSize) {
+                    isValid = false;
+                    alert('Размер изображения не должен превышать 100KB');
+                }
+            }
+            
+            if (!isValid) {
+                event.preventDefault();
+            }
         });
     });
 </script>

@@ -54,7 +54,7 @@
                 <a class="nav-link <?= str_contains($_SERVER['REQUEST_URI'], '/seller/messages') ? 'active' : '' ?>" href="/seller/messages">
                     <i class="bi bi-chat-dots me-1"></i>
                     Сообщения
-                    <?php if ($unreadNotifications > 0): ?>
+                    <?php if (isset($unreadNotifications) && $unreadNotifications > 0): ?>
                         <span class="badge bg-danger rounded-pill"><?= $unreadNotifications ?></span>
                     <?php endif; ?>
                 </a>

@@ -149,7 +149,7 @@ class SellerDashboardController extends DashboardController {
                 Application::$app->logger->warning(
                     'Попытка доступа к странице продуктов без профиля продавца', 
                     ['user_id' => $user->id],
-                    'users.log'
+                    'errors.log'
                 );
                 Application::$app->session->setFlash('error', 'Seller profile not found');
                 Application::$app->response->redirect('/seller');
@@ -308,47 +308,7 @@ class SellerDashboardController extends DashboardController {
             // Обработка загруженного изображения
             $imageUrl = '';
             if (isset($_FILES['image']) && $_FILES['image']['error'] === UPLOAD_ERR_OK) {
-                $uploadDir = Application::$app->rootPath . '/public/uploads/products/';
-                
-                // Создаем директорию, если она не существует
-                if (!file_exists($uploadDir)) {
-                    Application::$app->logger->info(
-                        'Создание директории для загрузки изображений', 
-                        ['dir' => $uploadDir],
-                        'products.log'
-                    );
-                    mkdir($uploadDir, 0777, true);
-                }
-                
-                $fileName = uniqid('product_') . '_' . basename($_FILES['image']['name']);
-                $uploadFile = $uploadDir . $fileName;
-                
-                // Проверяем тип файла
-                $allowedTypes = ['image/jpeg', 'image/png', 'image/gif', 'image/webp'];
-                $fileType = mime_content_type($_FILES['image']['tmp_name']);
-                
-                if (!in_array($fileType, $allowedTypes)) {
-                    Application::$app->session->setFlash('error', 'Invalid file type. Only JPG, PNG, GIF and WEBP are allowed.');
-                    Application::$app->response->redirect('/seller/products');
-                    return '';
-                }
-                
-                // Проверяем размер файла (макс. 2MB)
-                if ($_FILES['image']['size'] > 2 * 1024 * 1024) {
-                    Application::$app->session->setFlash('error', 'File is too large. Maximum size is 2MB.');
-                    Application::$app->response->redirect('/seller/products');
-                    return '';
-                }
-                
-                if (move_uploaded_file($_FILES['image']['tmp_name'], $uploadFile)) {
-                    $imageUrl = '/uploads/products/' . $fileName;
-                } else {
-                    Application::$app->logger->error(
-                        'Failed to upload product image', 
-                        ['user_id' => $user->id, 'file' => $_FILES['image']['name']],
-                        'products.log'
-                    );
-                }
+                $imageUrl = $this->processUploadedImage($_FILES['image'], $user->id, 'products');
             }
             
             // Подготовка данных для вставки
@@ -510,6 +470,13 @@ class SellerDashboardController extends DashboardController {
         
         $data = $this->request->getBody();
         
+        // Логирование полученных данных
+        Application::$app->logger->info(
+            'Получены данные для редактирования продукта', 
+            $data,
+            'products.log'
+        );
+        
         // Проверяем, что продукт существует и принадлежит текущему продавцу
         $statement = Application::$app->db->prepare("
             SELECT * FROM products 
@@ -533,59 +500,86 @@ class SellerDashboardController extends DashboardController {
         }
         
         // Валидация данных
-        if (empty($data['name']) || empty($data['description']) || !isset($data['price'])) {
-            Application::$app->session->setFlash('error', 'Please fill in all required fields');
+        $validationErrors = [];
+        
+        if (empty($data['product_name'])) {
+            $validationErrors[] = 'Название продукта обязательно';
+        }
+        
+        if (empty($data['description'])) {
+            $validationErrors[] = 'Описание продукта обязательно';
+        }
+        
+        if (!isset($data['price']) || $data['price'] === '') {
+            $validationErrors[] = 'Цена продукта обязательна';
+        }
+        
+        if (!empty($validationErrors)) {
+            Application::$app->logger->error(
+                'Ошибки валидации при редактировании продукта', 
+                ['errors' => $validationErrors, 'data' => $data],
+                'products.log'
+            );
+            Application::$app->session->setFlash('error', 'Please fill in all required fields: ' . implode(', ', $validationErrors));
             $this->redirect('/seller/products');
             return '';
         }
         
         // Обработка загруженного изображения
-        $imageUrl = $product['image_url']; // По умолчанию оставляем текущее изображение
+        $imageUrl = null; // По умолчанию изображение не задано
+        
+        // Получаем текущее изображение из таблицы product_images
+        $imageStatement = Application::$app->db->prepare("
+            SELECT image_url FROM product_images 
+            WHERE product_id = :product_id AND is_main = 1
+        ");
+        $imageStatement->execute(['product_id' => $data['id']]);
+        $currentImage = $imageStatement->fetch(PDO::FETCH_ASSOC);
+        
+        if ($currentImage) {
+            $imageUrl = $currentImage['image_url'];
+        }
         
         if (isset($_FILES['image']) && $_FILES['image']['error'] === UPLOAD_ERR_OK) {
-            $uploadDir = Application::$app->rootPath . '/public/uploads/products/';
+            $newImageUrl = $this->processUploadedImage($_FILES['image'], $user->id, 'products', $imageUrl);
             
-            // Создаем директорию, если она не существует
-            if (!file_exists($uploadDir)) {
-                mkdir($uploadDir, 0777, true);
-            }
-            
-            $fileName = uniqid('product_') . '_' . basename($_FILES['image']['name']);
-            $uploadFile = $uploadDir . $fileName;
-            
-            // Проверяем тип файла
-            $allowedTypes = ['image/jpeg', 'image/png', 'image/gif', 'image/webp'];
-            $fileType = mime_content_type($_FILES['image']['tmp_name']);
-            
-            if (!in_array($fileType, $allowedTypes)) {
-                Application::$app->session->setFlash('error', 'Invalid file type. Only JPG, PNG, GIF and WEBP are allowed.');
-                $this->redirect('/seller/products');
-                return '';
-            }
-            
-            // Проверяем размер файла (макс. 2MB)
-            if ($_FILES['image']['size'] > 2 * 1024 * 1024) {
-                Application::$app->session->setFlash('error', 'File is too large. Maximum size is 2MB.');
-                $this->redirect('/seller/products');
-                return '';
-            }
-            
-            if (move_uploaded_file($_FILES['image']['tmp_name'], $uploadFile)) {
-                $imageUrl = '/uploads/products/' . $fileName;
-                
-                // Удаляем старое изображение, если оно существует
-                if (!empty($product['image_url'])) {
-                    $oldImagePath = Application::$app->rootPath . '/public' . $product['image_url'];
-                    if (file_exists($oldImagePath)) {
-                        unlink($oldImagePath);
-                    }
+            if ($newImageUrl) {
+                // Если есть изображение, обновляем его в таблице product_images
+                if ($currentImage) {
+                    $updateImageStmt = Application::$app->db->prepare("
+                        UPDATE product_images 
+                        SET image_url = :image_url 
+                        WHERE product_id = :product_id AND is_main = 1
+                    ");
+                    $updateImageStmt->execute([
+                        'image_url' => $newImageUrl,
+                        'product_id' => $data['id']
+                    ]);
+                    
+                    Application::$app->logger->info(
+                        'Обновлено изображение для продукта', 
+                        ['product_id' => $data['id'], 'old_image' => $imageUrl, 'new_image' => $newImageUrl],
+                        'products.log'
+                    );
+                } else {
+                    // Если изображения нет, добавляем его в таблицу product_images
+                    $insertImageStmt = Application::$app->db->prepare("
+                        INSERT INTO product_images (product_id, image_url, is_main) 
+                        VALUES (:product_id, :image_url, 1)
+                    ");
+                    $insertImageStmt->execute([
+                        'product_id' => $data['id'],
+                        'image_url' => $newImageUrl
+                    ]);
+                    
+                    Application::$app->logger->info(
+                        'Добавлено изображение для продукта', 
+                        ['product_id' => $data['id'], 'image_url' => $newImageUrl],
+                        'products.log'
+                    );
                 }
-            } else {
-                Application::$app->logger->error(
-                    'Failed to upload product image during edit', 
-                    ['user_id' => $user->id, 'product_id' => $data['id'], 'file' => $_FILES['image']['name']],
-                    'products.log'
-                );
+                
+                $imageUrl = $newImageUrl;
             }
         }
         
@@ -620,33 +614,42 @@ class SellerDashboardController extends DashboardController {
         $categoryId = !empty($data['category_id']) ? $data['category_id'] : null;
         
         try {
-            $statement = Application::$app->db->prepare("
+            // Логирование SQL запроса и параметров
+            $sql = "
                 UPDATE products 
-                SET product_name = :name, 
+                SET product_name = :product_name, 
                     description = :description, 
                     price = :price, 
                     category_id = :category_id, 
                     is_active = :is_active, 
-                    available_for_preorder = :available_for_preorder, 
-                    updated_at = NOW()
+                    available_for_preorder = :available_for_preorder
                 WHERE id = :id AND seller_profile_id = :seller_profile_id
-            ");
+            ";
             
-            $result = $statement->execute([
+            $params = [
                 'id' => $data['id'],
-                'name' => $data['name'],
+                'product_name' => $data['product_name'],
                 'description' => $data['description'],
                 'price' => (float)$data['price'],
                 'category_id' => $categoryId,
                 'is_active' => $isActive,
                 'available_for_preorder' => $availableForPreorder,
                 'seller_profile_id' => $sellerProfile['id']
-            ]);
+            ];
+            
+            Application::$app->logger->info(
+                'SQL запрос на обновление продукта', 
+                ['sql' => $sql, 'params' => $params],
+                'products.log'
+            );
+            
+            $statement = Application::$app->db->prepare($sql);
+            $result = $statement->execute($params);
             
             if ($result) {
                 Application::$app->logger->info(
-                    'Product updated successfully', 
-                    ['user_id' => $user->id, 'product_id' => $data['id'], 'product_name' => $data['name']],
+                    'Продукт успешно обновлен', 
+                    ['user_id' => $user->id, 'product_id' => $data['id'], 'product_name' => $data['product_name']],
                     'products.log'
                 );
                 Application::$app->session->setFlash('success', 'Product updated successfully');
@@ -654,7 +657,7 @@ class SellerDashboardController extends DashboardController {
                 Application::$app->session->setFlash('error', 'Failed to update product');
                 Application::$app->logger->error(
                     'Failed to update product', 
-                    ['user_id' => $user->id, 'product_id' => $data['id'], 'product_name' => $data['name']],
+                    ['user_id' => $user->id, 'product_id' => $data['id'], 'product_name' => $data['product_name']],
                     'products.log'
                 );
             }
@@ -662,15 +665,8 @@ class SellerDashboardController extends DashboardController {
             Application::$app->session->setFlash('error', 'An error occurred: ' . $e->getMessage());
             Application::$app->logger->error(
                 'Exception when updating product: ' . $e->getMessage(), 
-                [
-                    'exception' => $e->getMessage(),
-                    'trace' => $e->getTraceAsString(),
-                    'file' => $e->getFile(),
-                    'line' => $e->getLine(),
-                    'data' => $data,
-                    'sql_error' => Application::$app->db->errorInfo()
-                ],
-                'errors.log'
+                ['exception' => $e, 'trace' => $e->getTraceAsString(), 'data' => $data],
+                'products.log'
             );
         }
         
@@ -880,6 +876,114 @@ class SellerDashboardController extends DashboardController {
         }
     }
 
+    /**
+     * Страница профиля продавца
+     * @return string
+     */
+    public function profile() {
+        $this->view->title = 'Профиль продавца';
+        
+        $user = $this->getUserProfile();
+        $sellerProfile = $this->getSellerProfile($user->id);
+        
+        if (!$sellerProfile) {
+            Application::$app->session->setFlash('error', 'Профиль продавца не найден');
+            $this->redirect('/seller');
+            return '';
+        }
+        
+        // Если форма отправлена, обрабатываем обновление профиля
+        if ($this->request->isPost()) {
+            $data = $this->request->getBody();
+            
+            // Валидация данных
+            $validationErrors = [];
+            
+            if (empty($data['name'])) {
+                $validationErrors[] = 'Название магазина обязательно';
+            }
+            
+            if (empty($data['description'])) {
+                $validationErrors[] = 'Описание магазина обязательно';
+            }
+            
+            if (!empty($validationErrors)) {
+                Application::$app->session->setFlash('error', 'Пожалуйста, заполните все обязательные поля: ' . implode(', ', $validationErrors));
+            } else {
+                // Обработка загруженного изображения для аватара
+                $avatarUrl = $sellerProfile['avatar_url'];
+                if (isset($_FILES['avatar']) && $_FILES['avatar']['error'] === UPLOAD_ERR_OK) {
+                    $avatarUrl = $this->processUploadedImage($_FILES['avatar'], $user->id, 'avatars', $avatarUrl);
+                }
+                
+                // Обновляем профиль продавца
+                $statement = Application::$app->db->prepare("
+                    UPDATE seller_profiles 
+                    SET name = :name, 
+                        description = :description, 
+                        email = :email, 
+                        phone = :phone, 
+                        avatar_url = :avatar_url,
+                        updated_at = NOW() 
+                    WHERE id = :id
+                ");
+                
+                $statement->execute([
+                    'name' => $data['name'],
+                    'description' => $data['description'],
+                    'email' => $data['email'] ?? '',
+                    'phone' => $data['phone'] ?? '',
+                    'avatar_url' => $avatarUrl,
+                    'id' => $sellerProfile['id']
+                ]);
+                
+                Application::$app->session->setFlash('success', 'Профиль успешно обновлен');
+                $this->redirect('/seller/profile');
+                return '';
+            }
+        }
+        
+        // Получаем все доступные способы оплаты
+        $paymentMethods = $this->getPaymentMethods();
+        
+        // Получаем выбранные способы оплаты для текущего продавца
+        $sellerPaymentOptions = $this->getSellerPaymentOptions($sellerProfile['id']);
+        
+        return $this->render('seller/profile/index', [
+            'user' => $user,
+            'sellerProfile' => $sellerProfile,
+            'paymentMethods' => $paymentMethods,
+            'sellerPaymentOptions' => $sellerPaymentOptions
+        ]);
+    }
+
+    /**
+     * Получаем все доступные способы оплаты
+     * @return array
+     */
+    private function getPaymentMethods() {
+        $statement = Application::$app->db->prepare("
+            SELECT * FROM payment_methods
+        ");
+        $statement->execute();
+        return $statement->fetchAll();
+    }
+
+    /**
+     * Получаем выбранные способы оплаты для текущего продавца
+     * @param int $sellerProfileId
+     * @return array
+     */
+    private function getSellerPaymentOptions(int $sellerProfileId) {
+        $statement = Application::$app->db->prepare("
+            SELECT payment_method_id FROM seller_payment_options
+            WHERE seller_profile_id = :seller_profile_id
+        ");
+        $statement->execute(['seller_profile_id' => $sellerProfileId]);
+        $options = $statement->fetchAll(PDO::FETCH_COLUMN);
+        return $options;
+    }
+
     private function getSellerProfile(int $userId) {
         // Логирование запроса на получение профиля продавца
         Application::$app->logger->info(
@@ -1055,5 +1159,224 @@ class SellerDashboardController extends DashboardController {
         ");
         $statement->execute(['user_id' => $userId]);
         return $statement->fetchAll();
+    }
+
+    /**
+     * Обрабатывает загруженное изображение с учетом требований
+     * @param array $file Загруженный файл из $_FILES
+     * @param int $userId ID пользователя для создания персональной директории
+     * @param string $type Тип изображения (products, avatars, etc.)
+     * @param string|null $oldImageUrl URL старого изображения (для редактирования)
+     * @param string|null $altText Альтернативный текст для изображения
+     * @return string URL нового изображения или дефолтного
+     */
+    private function processUploadedImage($file, $userId, $type = 'products', $oldImageUrl = null, $altText = null) {
+        // Проверяем, загружен ли файл
+        if (!isset($file) || $file['error'] !== UPLOAD_ERR_OK) {
+            return $oldImageUrl ?: '/assets/images/default-' . $type . '.svg';
+        }
+        
+        // Базовая директория для загрузок
+        $baseUploadDir = Application::$app->rootPath . '/public/uploads/';
+        
+        // Создаем директорию пользователя
+        $userDir = $baseUploadDir . $userId . '/';
+        if (!file_exists($userDir)) {
+            mkdir($userDir, 0777, true);
+        }
+        
+        // Создаем директорию для типа файлов
+        $typeDir = $userDir . $type . '/';
+        if (!file_exists($typeDir)) {
+            mkdir($typeDir, 0777, true);
+        }
+        
+        // Проверяем тип файла
+        $allowedTypes = ['image/avif', 'image/webp'];
+        $fileType = mime_content_type($file['tmp_name']);
+        
+        if (!in_array($fileType, $allowedTypes)) {
+            Application::$app->session->setFlash('error', 'Invalid file type. Only AVIF and WebP are allowed.');
+            return $oldImageUrl ?: '/assets/images/default-' . $type . '.svg';
+        }
+        
+        // Проверяем размер файла (макс. 100KB)
+        if ($file['size'] > 100 * 1024) {
+            Application::$app->session->setFlash('error', 'File is too large. Maximum size is 100KB.');
+            return $oldImageUrl ?: '/assets/images/default-' . $type . '.svg';
+        }
+        
+        // Убедимся, что расширение файла корректное (avif или webp)
+        $fileInfo = pathinfo($file['name']);
+        $extension = strtolower($fileInfo['extension']);
+        if (!in_array($extension, ['avif', 'webp'])) {
+            $extension = 'webp'; // По умолчанию используем webp
+        }
+        
+        // Создаем чистое имя файла без пробелов и специальных символов
+        $hash = md5($file['name'] . time() . rand(1000, 9999));
+        $fileName = $type . '_' . time() . '_' . $hash . '.' . $extension;
+        $uploadFile = $typeDir . $fileName;
+        
+        // Перемещаем файл
+        if (!move_uploaded_file($file['tmp_name'], $uploadFile)) {
+            Application::$app->logger->error(
+                'Failed to upload image', 
+                ['user_id' => $userId, 'file' => $file['name'], 'target' => $uploadFile],
+                'uploads.log'
+            );
+            return $oldImageUrl ?: '/assets/images/default-' . $type . '.svg';
+        }
+        
+        // Удаляем старое изображение, если оно существует и не является дефолтным
+        if ($oldImageUrl && strpos($oldImageUrl, 'default-') === false) {
+            $oldImagePath = Application::$app->rootPath . '/public' . $oldImageUrl;
+            if (file_exists($oldImagePath)) {
+                unlink($oldImagePath);
+            }
+        }
+        
+        // Логируем успешную загрузку
+        Application::$app->logger->info(
+            'Uploaded image successfully', 
+            [
+                'user_id' => $userId, 
+                'file' => $fileName, 
+                'type' => $type, 
+                'alt_text' => $altText
+            ],
+            'uploads.log'
+        );
+        
+        // Возвращаем URL для сохранения в базе данных
+        return '/uploads/' . $userId . '/' . $type . '/' . $fileName;
+    }
+
+    /**
+     * u0418u0441u043fu0440u0430u0432u043bu0435u043du0438u0435 u043cu0435u0442u043eu0434u0430 editProduct u0434u043bu044f u0440u0430u0431u043eu0442u044b u0441 u0442u0430u0431u043bu0438u0446u0435u0439 product_images u0432u043cu0435u0441u0442u043e u043au043eu043bu043eu043du043au0438 image_url u0432 u0442u0430u0431u043bu0438u0446u0435 products
+     * @return string
+     */
+    public function fixProductImages() {
+        $user = $this->getUserProfile();
+        $sellerProfile = $this->getSellerProfile($user->id);
+        
+        if (!$sellerProfile) {
+            Application::$app->session->setFlash('error', 'u041fu0440u043eu0444u0438u043bu044c u043fu0440u043eu0434u0430u0432u0446u0430 u043du0435 u043du0430u0439u0434u0435u043d');
+            $this->redirect('/seller');
+            return '';
+        }
+        
+        // u0421u043eu0437u0434u0430u0435u043c u0434u0435u0444u043eu043bu0442u043du043eu043e u0438u0437u043eu0431u0440u0430u0436u0435u043du0438u0435, u0435u0441u043bu0438 u043eu043du043e u043du0435 u0441u0443u0447u0435u0441u0442u0432u0443u0435u0442
+        $defaultImagePath = Application::$app->rootPath . '/public/assets/images/default-products.svg';
+        if (!file_exists($defaultImagePath)) {
+            $defaultImageContent = '<svg xmlns="http://www.w3.org/2000/svg" width="200" height="200" viewBox="0 0 200 200">
+                <rect width="200" height="200" fill="#f8f9fa"/>
+                <text x="50%" y="50%" font-family="Arial" font-size="20" text-anchor="middle" dominant-baseline="middle" fill="#6c757d">No Image</text>
+            </svg>';
+            
+            if (!is_dir(dirname($defaultImagePath))) {
+                mkdir(dirname($defaultImagePath), 0777, true);
+            }
+            
+            file_put_contents($defaultImagePath, $defaultImageContent);
+        }
+        
+        // u041fu043eu043blu0443u0447u0430u0435u043c u0432u0441u0435 u043fu0440u043eu0434u0443u043au0442u044b u043fu0440u043eu0434u0430u0432u0446u0430
+        $statement = Application::$app->db->prepare("
+            SELECT p.id, p.product_name, pi.image_url, pi.id as image_id 
+            FROM products p
+            LEFT JOIN product_images pi ON p.id = pi.product_id AND pi.is_main = 1
+            WHERE p.seller_profile_id = :seller_profile_id
+        ");
+        $statement->execute(['seller_profile_id' => $sellerProfile['id']]);
+        $products = $statement->fetchAll();
+        
+        $fixedCount = 0;
+        
+        foreach ($products as $product) {
+            // u041fu0440u043eu0432u0435u0440u044fu0435u043c u0441u0443u0447u0435u0441u0442u0432u043eu0432u0430u043du0438u0435 u0444u0430u0439u043bu0430 u0438u0437u043eu0431u0440u0430u0436u0435u043du0438u0439 u043fu0440u043eu0434u0443u043au0442u0430
+            $imageExists = false;
+            
+            if (!empty($product['image_url'])) {
+                $imagePath = Application::$app->rootPath . '/public' . $product['image_url'];
+                $imageExists = file_exists($imagePath);
+            }
+            
+            // u0415u0441u043bu0438 u0438u0437u043eu0431u0440u0430u0436u0435u043du0438u0435 u043du0435 u0441u0443u0447u0435u0441u0442u0432u0443u0435u0442, u0443u0441u0442u0430u043du0430u0432u043bu0438u0432u0430u0435u043c u0434u0435u0444u043eu043bu0442u043du043eu043e
+            if (!$imageExists) {
+                $defaultImageUrl = '/assets/images/default-products.svg';
+                
+                if (isset($product['image_id']) && $product['image_id']) {
+                    // u041eu0431u043du043eu0432u043bu044fu0435u043c u0441u0443u0447u0435u0441u0442u0432u0443u044eu0447u0443u044e u0437u0430u043fu0438u0441u044c u0432 product_images
+                    $updateStmt = Application::$app->db->prepare("
+                        UPDATE product_images 
+                        SET image_url = :image_url 
+                        WHERE id = :id
+                    ");
+                    $updateStmt->execute([
+                        'image_url' => $defaultImageUrl,
+                        'id' => $product['image_id']
+                    ]);
+                    
+                    Application::$app->logger->info(
+                        'u0418u0441u043fu0440u0430u0432u043bu0435u043du043e u0438u0437u043eu0431u0440u0430u0436u0435u043du0438u0435 u043fu0440u043eu0434u0443u043au0442u0430', 
+                        ['product_id' => $product['id'], 'old_image' => $product['image_url'], 'new_image' => $defaultImageUrl],
+                        'products.log'
+                    );
+                } else {
+                    // u0421u043eu0437u0434u0430u0435u043c u043du043eu0432u0443u044e u0437u0430u043fu0438u0441u044c u0432 product_images
+                    $insertStmt = Application::$app->db->prepare("
+                        INSERT INTO product_images (product_id, image_url, is_main) 
+                        VALUES (:product_id, :image_url, 1)
+                    ");
+                    $insertStmt->execute([
+                        'product_id' => $product['id'],
+                        'image_url' => $defaultImageUrl
+                    ]);
+                    
+                    Application::$app->logger->info(
+                        'u0414u043eu0431u0430u0432u043bu0435u043du043e u0434u0435u0444u043eu043bu0442u043du043eu043e u0438u0437u043eu0431u0440u0430u0436u0435u043du0438u0435 u043fu0440u043eu0434u0443u043au0442u0430 u0431u0435u0437 u0438u0437u043eu0431u0440u0430u0436u0435u043du0438u0439', 
+                        ['product_id' => $product['id'], 'new_image' => $defaultImageUrl],
+                        'products.log'
+                    );
+                }
+                
+                $fixedCount++;
+            }
+        }
+        
+        // u0421u043eu0437u0434u0430u0435u043c u0434u0435u0444u043eu043bu0442u043du043eu043e u0438u0437u043eu0431u0440u0430u0436u0435u043du0438u0435 u0434u043bu044f u043fu0440u043eu0434u0443u043au0442u0430 u0431u0435u0437 u0438u0437u043eu0431u0440u0430u0436u0435u043du0438u0439
+        $noImagesStmt = Application::$app->db->prepare("
+            SELECT p.id, p.product_name 
+            FROM products p
+            LEFT JOIN product_images pi ON p.id = pi.product_id
+            WHERE p.seller_profile_id = :seller_profile_id AND pi.id IS NULL
+        ");
+        $noImagesStmt->execute(['seller_profile_id' => $sellerProfile['id']]);
+        $productsWithoutImages = $noImagesStmt->fetchAll();
+        
+        foreach ($productsWithoutImages as $product) {
+            // u0421u043eu0437u0434u0430u0435u043c u043du043eu0432u0443u044e u0437u0430u043fu0438u0441u044c u0432 product_images
+            $insertStmt = Application::$app->db->prepare("
+                INSERT INTO product_images (product_id, image_url, is_main) 
+                VALUES (:product_id, :image_url, 1)
+            ");
+            $insertStmt->execute([
+                'product_id' => $product['id'],
+                'image_url' => '/assets/images/default-products.svg'
+            ]);
+            
+            Application::$app->logger->info(
+                'u0414u043eu0431u0430u0432u043bu0435u043du043e u0434u0435u0444u043eu043bu0442u043du043eu043e u0438u0437u043eu0431u0440u0430u0436u0435u043du0438u0435 u043fu0440u043eu0434u0443u043au0442u0430 u0431u0435u0437 u0438u0437u043eu0431u0440u0430u0436u0435u043du0438u0439', 
+                ['product_id' => $product['id'], 'new_image' => '/assets/images/default-products.svg'],
+                'products.log'
+            );
+            
+            $fixedCount++;
+        }
+        
+        Application::$app->session->setFlash('success', "u0418u0441u043fu0440u0430u0432u043bu0435u043du043e u0438u0437u043eu0431u0440u0430u0436u0435u043du0438u0439: {$fixedCount}");
+        $this->redirect('/seller/products');
+        return '';
     }
 }
