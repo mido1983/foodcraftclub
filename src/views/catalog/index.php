@@ -46,7 +46,7 @@
                             <div class="form-check">
                                 <input class="form-check-input seller-filter" type="radio" name="seller" id="seller-<?= $seller['id'] ?>" value="<?= $seller['id'] ?>">
                                 <label class="form-check-label" for="seller-<?= $seller['id'] ?>">
-                                    <?= htmlspecialchars($seller['name'] ?? $seller['full_name']) ?>
+                                    <?= htmlspecialchars($seller['name'] ?? $seller['full_name'] ?? '') ?>
                                 </label>
                             </div>
                         <?php endforeach; ?>

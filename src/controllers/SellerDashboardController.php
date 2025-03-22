@@ -208,7 +208,7 @@ class SellerDashboardController extends DashboardController {
                 $categories = $categoriesStmt->fetchAll();
             }
             
-            return $this->render('seller/dashboard/products', [
+            return $this->render('seller/products/index', [
                 'user' => $user,
                 'sellerProfile' => $sellerProfile,
                 'products' => $products,
@@ -440,7 +440,7 @@ class SellerDashboardController extends DashboardController {
             // u0412u0430u043bu0438u0434u0430u0446u0438u044f u0434u0430u043du043du044bu0443
             $errors = [];
             
-            // u041fu0440u043eu0432u0435u0440u043au0430 u043du0430 u043du0430u043bu0438u0447u0438u0435 u043eu0431u044fu0437u0430u0442u0435u043bu044cu043du044bu0443 u043fu0440u043eu0444u0438u043bu044h
+            // u041fu0440u043eu0432u0435u0440u043au0430 u043du0430 u043du0430u043lu0438u0447u0438u0435 u043eu0431u044fu0437u0430u0442u0435u043lu044cu043du044bu0443 u043fu0440u043eu0444u0438u043lu044h
             if (empty($data['name'])) {
                 $errors[] = 'Shop name is required';
             }
@@ -454,7 +454,7 @@ class SellerDashboardController extends DashboardController {
                     $db = Application::$app->db;
                     $db->beginTransaction();
                     
-                    // u041eu0431u043du0435u0432u043bu0435u043du0438u0435 u043eu0441u043du043eu0432u043du044bu0443 u0434u0430u043du043du044bu0443 u043fu0440u043eu0444u0438u043bu044h
+                    // u041eu0431u043du0435u0432u043bu0435u043du0438u0435 u043eu0441u043du043eu0432u043du044bu0443 u0434u0430u043du043du044bu0443 u043fu0440u043eu0444u0438u043lu044h
                     $updateStmt = $db->prepare("
                         UPDATE seller_profiles 
                         SET name = :name, 
@@ -489,7 +489,7 @@ class SellerDashboardController extends DashboardController {
                             $filePath = $uploadDir . $fileName;
                             
                             if (move_uploaded_file($_FILES['avatar']['tmp_name'], $filePath)) {
-                                // u041eu0431u043du0435u0432u043bu044fu0435u043c u043fu0443u0442u044c u043a u0430u0432u0430u0442u0430u0440u0443 u0432 u0431u0430u0437u0435 u0434u0430u043du043du044bu0443
+                                // u041eu0431u043du043e0432u043bu044fu0435u043c u043fu0443u0442u044c u043a u0430u0432u0430u0442u0430u0440u0443 u0432 u0431u0430u0437u0435 u0434u0430u043du043du044bu0443
                                 $avatarUpdateStmt = $db->prepare("UPDATE seller_profiles SET avatar_url = :avatar_url WHERE user_id = :user_id");
                                 $avatarUpdateStmt->execute([
                                     'user_id' => $user->id,
@@ -505,7 +505,7 @@ class SellerDashboardController extends DashboardController {
                     
                     // u041eu0431u0440u0430u0431u043eu0442u043au0430 u0441u043fu043eu0441u043eu0431u044b u043eu043fu043bu0430u0442u044b
                     if (isset($data['payment_methods']) && is_array($data['payment_methods'])) {
-                        // u0423u0434u0430u043bu044fu0435u043c u0442u0435u043au0443u0447u0438u0435 u0441u043fu043eu0441u043eu0431u044b u043eu043fu043bu0430u0442u044b
+                        // u0423u0434u0430u043bu0438u0435u043c u0442u0435u043au0443u0447u0438u0435 u0441u043fu043eu0441u043eu0431u044b u043eu043fu043bu0430u0442u044b
                         $deletePaymentStmt = $db->prepare("DELETE FROM seller_payment_options WHERE seller_profile_id = :seller_profile_id");
                         $deletePaymentStmt->execute(['seller_profile_id' => $sellerProfile['id']]);
                         
@@ -671,11 +671,22 @@ class SellerDashboardController extends DashboardController {
             // Определение статуса доступности товара
             $isAvailable = 1; // По умолчанию товар доступен
             if (isset($body['product_status'])) {
-                if ($body['product_status'] === 'draft' || $body['product_status'] === 'sold_out') {
-                    $isAvailable = 0;
+                switch ($body['product_status']) {
+                    case 'active':
+                        $isActive = 1;
+                        $isPreorder = 0;
+                        break;
+                    case 'inactive':
+                        $isActive = 0;
+                        $isPreorder = 0;
+                        break;
+                    case 'preorder':
+                        $isActive = 1;
+                        $isPreorder = 1;
+                        break;
                 }
             }
-
+            
             // Сохранение товара в базу данных
             $db = Application::$app->db;
             $statement = $db->prepare("
@@ -782,21 +793,21 @@ class SellerDashboardController extends DashboardController {
             $user = $this->getUserProfile();
             if (!$user) {
                 Application::$app->session->setFlash('error', 'u0412u044b u0434u043eu043bu0436u043du044b u0431u044bu0442u044c u0430u0432u0442u043eu0440u0438u0437u043eu0432u0430u043du044b');
-                return $this->response->redirect('/login');
+                return Application::$app->response->redirect('/login');
             }
             
             $sellerProfile = $this->getSellerProfile($user->id);
             if (!$sellerProfile) {
                 Application::$app->session->setFlash('error', 'u0423 u0432u0430u0441 u043du0435u0442 u043fu0440u043eu0444u0438u043bu044f u043fu0440u043eu0434u0430u0432u0446u0430');
-                return $this->response->redirect('/seller/profile');
+                return Application::$app->response->redirect('/seller/profile');
             }
             
             $body = $this->request->getBody();
             
-            // u041fu0440u043e0432u0435u0440u043au0430 u043du0430 u043du0430u043b0438u0447u0438u0435 u043e0431u044fu0437u0430u0442u0435u043b0435u0439
+            // u041fu0440u043e0432u0435u0440u043au0430 u043du0430 u043du0430u043lu0438u0447u0438u0435 u043e0431u044fu0437u0430u0442u0435u043lu044cu043du044bu0443 u043fu0440u043eu0444u0438u043lu044h
             if (empty($body['id']) || empty($body['product_name']) || empty($body['price'])) {
                 Application::$app->session->setFlash('error', 'u041du0435u043e0431u0445043e04340438u043c043e u04370430043f043e043b043d0438u0442u044c u0432u04410435 u043e0431u044fu0437u0430u04420435u043b0435u0439');
-                return $this->response->redirect('/seller/products');
+                return Application::$app->response->redirect('/seller/products');
             }
             
             // u041fu0440u043e0432u0435u0440u043au0430, u0447u0442u043e u043f0440u043e0434u0443u043a0442 u043f04400438u043d04300434043b043504360438u0442 u043d0430 u0442043e043c u043f0440u043e04340430u04320446u0430
@@ -814,10 +825,10 @@ class SellerDashboardController extends DashboardController {
             $product = $checkStatement->fetch(PDO::FETCH_ASSOC);
             if (!$product) {
                 Application::$app->session->setFlash('error', 'u041f0440u043e0434u0443u043a0442 u043d0435 u043d0430u043904340435u043d u0438u043b0438 u0443 u04320430u0441 u043d0435u0442 u043f04400430u0432 u043d0430 u0435u0433u043e u0440043504340430u043a04420438u0440u043e04320430u043d0438u0435');
-                return $this->response->redirect('/seller/products');
+                return Application::$app->response->redirect('/seller/products');
             }
             
-            // u041e0431u043d043e0432u043b0435u043d0438u0435 u044104420430u0442u0443u04410430 u043f0440u043e0434u0443u043a0442u0430
+            // u041eu0431u043du043e0432u043bu0435u043du0438u0435 u044104420430u0442u0443u04410430 u043f0440u043e0434u0443u043a0442u0430
             $isActive = 0;
             $isPreorder = 0;
             
@@ -838,7 +849,7 @@ class SellerDashboardController extends DashboardController {
                 }
             }
             
-            // u041e0431u04400430u0431043e0434u043a0430 u0437043004330430270435u043d0438u0435 u04380437043e0431u0440043004360435043d0438u044f, u0435u0441u043b0438 u043e043d043e u0431044b043b043e u0437043004330430270435u043d0438u0435
+            // u041eu0431u04400430u0431043e0434u043a0430 u0437043004330430270435u043d0438u0438 u04380437043e0431u0440043004360435u043d0438u044f, u0435u0441u043b0438 u043e043d043e u0431044b043b043e u0437043004330430270435u043d0438u0438
             $fileName = null;
             if (isset($_FILES['image']) && $_FILES['image']['error'] === UPLOAD_ERR_OK) {
                 $allowedTypes = ['image/avif', 'image/webp'];
@@ -847,7 +858,7 @@ class SellerDashboardController extends DashboardController {
                 if (in_array($_FILES['image']['type'], $allowedTypes) && $_FILES['image']['size'] <= $maxSize) {
                     $uploadDir = __DIR__ . '/../../public/uploads/products/';
                     
-                    // u0421u043e043704340430u0435u043c u04340438u04400435u043a043844043e0440u0438u044e, u0435u0441u043b0438 u043e043d0430 u043d0435 u0441u0443u04470435u0441u044204320443u0435u0442
+                    // u0421u043eu0437u0434u0430u0435u043c u0434u0438u0440u0435u043au0442u043eu0440u0438u044e, u0435u0441u043bu0438 u043eu043du0430 u043du0435 u0441u0443u0447u0435u0441u0442u0432u0443u0435u0442
                     if (!file_exists($uploadDir)) {
                         mkdir($uploadDir, 0755, true);
                     }
@@ -856,7 +867,7 @@ class SellerDashboardController extends DashboardController {
                     $filePath = $uploadDir . $fileName;
                     
                     if (move_uploaded_file($_FILES['image']['tmp_name'], $filePath)) {
-                        // u041e0431u043d043e0432u043b0435u043d0438u0435 u04380437043e0431u0440043004360435u043d0438u044f u0432 u044204300431u043b0438u04460435 product_images
+                        // u041eu0431u043du043e0432u043bu044fu0435u043c u04380437043e0431u0440043004360435u043d0438u044f u0432 u044204300431u043b0438u04460435 product_images
                         $imageStatement = $db->prepare("
                             SELECT id FROM product_images WHERE product_id = :product_id AND is_main = 1
                         ");
@@ -864,7 +875,7 @@ class SellerDashboardController extends DashboardController {
                         $mainImage = $imageStatement->fetch(PDO::FETCH_ASSOC);
                         
                         if ($mainImage) {
-                            // u041e0431u043d043e0432u043b0435u043d0438u0435 u0441u0443u04490435u0441u044204320443u0435u04490435u0435 u04380437043e0431u0440043004360435u043d0438u0435
+                            // u041eu0431u043du043e0432u043bu044fu0435u043c u0441u0443u04490435u0441u044204320443u0435u04490435u0435 u04380437043e0431u0440043004360435u043d0438u0435
                             $updateImageStatement = $db->prepare("
                                 UPDATE product_images SET image_url = :image_url WHERE id = :id
                             ");
@@ -873,7 +884,7 @@ class SellerDashboardController extends DashboardController {
                                 'image_url' => '/uploads/products/' . $fileName
                             ]);
                         } else {
-                            // u0421u043e043704340430u043d0438u0435 u043d043e0432043e0433043e u04380437043e0431u0440043004360435u043d0438u044f
+                            // u0421u043eu0437u0434u0430u0435u043c u043du043e0432043e0433043e u04380437043e0431u0440043004360435u043d0438u044f
                             $insertImageStatement = $db->prepare("
                                 INSERT INTO product_images (product_id, image_url, is_main)
                                 VALUES (:product_id, :image_url, :is_main)
@@ -892,7 +903,7 @@ class SellerDashboardController extends DashboardController {
                 }
             }
             
-            // u041e0431u043d043e0432u043b0435u043d0438u0435 u04340430u043d043d0438u0445 u043f0440u043e0434u0443u043a0442u0430
+            // u041eu0431u043du043e0432u043bu0435u043du0438u0435 u04340430u043d043d0438u0445 u043f0440u043e0434u0443u043a0442u0430
             $updateStatement = $db->prepare("
                 UPDATE products SET
                     product_name = :product_name,
@@ -902,6 +913,7 @@ class SellerDashboardController extends DashboardController {
                     available_for_preorder = :available_for_preorder,
                     quantity = :quantity,
                     weight = :weight,
+                    category_id = :category_id,
                     updated_at = NOW()
                 WHERE id = :id AND seller_profile_id = :seller_profile_id
             ");
@@ -915,6 +927,7 @@ class SellerDashboardController extends DashboardController {
                 'available_for_preorder' => $isPreorder,
                 'quantity' => isset($body['quantity']) ? intval($body['quantity']) : 1,
                 'weight' => isset($body['weight']) ? intval($body['weight']) : 0,
+                'category_id' => isset($body['category_id']) ? intval($body['category_id']) : null,
                 'seller_profile_id' => $sellerProfile['id']
             ]);
             
@@ -925,12 +938,12 @@ class SellerDashboardController extends DashboardController {
                     'products.log'
                 );
                 
-                Application::$app->session->setFlash('success', 'u041f0440u043e0434u0443u043a0442 u0443u0441u043f0435u0448u043du043e u043e0431u043d043e0432u043b0435u043d');
+                Application::$app->session->setFlash('success', 'u041f0440u043e0434u0443u043a0442 u0443u0441u043f0435u0448u043du043e u043e0431u043du043e0432u043b0435u043d');
             } else {
-                throw new \Exception('u041e0430440438u0438u0431043a0430 u043f04400438 u043e0431u043d043e0432u043b0435u043d0438u0438 u043f0440u043e0434u0443u043a0442u0430');
+                throw new \Exception('u041e0430440438u0438u0431043a0430 u043f04400438 u043e0431u043du043e0432u043b0435u043d0438u0438 u043f0440u043e0434u0443u043a0442u0430');
             }
             
-            return $this->response->redirect('/seller/products');
+            return Application::$app->response->redirect('/seller/products');
             
         } catch (\Exception $e) {
             Application::$app->logger->error(
@@ -938,8 +951,8 @@ class SellerDashboardController extends DashboardController {
                 ['user_id' => $user->id ?? null, 'error' => $e->getMessage()]
             );
             
-            Application::$app->session->setFlash('error', 'u041e0430440438u0438u0431043a0430 u043f04400438 u043e0431u043d043e0432u043b0435u043d0438u0438 u043f0440u043e0434u0443u043a0442u0430: ' . $e->getMessage());
-            return $this->response->redirect('/seller/products');
+            Application::$app->session->setFlash('error', 'u041e0430440438u0438u0431043a0430 u043f04400438 u043e0431u043du043e0432u043b0435u043d0438u0438 u043f0440u043e0434u0443u043a0442u0430: ' . $e->getMessage());
+            return Application::$app->response->redirect('/seller/products');
         }
     }
 }
