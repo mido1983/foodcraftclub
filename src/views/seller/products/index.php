@@ -43,6 +43,8 @@
                                 <th>Название</th>
                                 <th>Категория</th>
                                 <th>Цена</th>
+                                <th>Количество</th>
+                                <th>Вес (г)</th>
                                 <th>Статус</th>
                                 <th>Действия</th>
                             </tr>
@@ -61,6 +63,8 @@
                                     <td><?= htmlspecialchars($product['product_name']) ?></td>
                                     <td><?= htmlspecialchars($product['category_name'] ?? 'Без категории') ?></td>
                                     <td><?= number_format($product['price'], 2) ?> ₽</td>
+                                    <td><?= isset($product['quantity']) ? $product['quantity'] : '1' ?></td>
+                                    <td><?= isset($product['weight']) ? $product['weight'] : '0' ?></td>
                                     <td>
                                         <?php if ($product['is_active']): ?>
                                             <span class="badge bg-success">Активен</span>
@@ -80,6 +84,8 @@
                                                     data-category="<?= $product['category_id'] ?>"
                                                     data-active="<?= $product['is_active'] ?>"
                                                     data-preorder="<?= $product['available_for_preorder'] ?? '0' ?>"
+                                                    data-quantity="<?= isset($product['quantity']) ? $product['quantity'] : '1' ?>"
+                                                    data-weight="<?= isset($product['weight']) ? $product['weight'] : '0' ?>"
                                                     data-bs-toggle="modal" data-bs-target="#editProductModal">
                                                 <i class="bi bi-pencil"></i>
                                             </button>
@@ -139,6 +145,14 @@
                         <label for="editProductImage" class="form-label">Изображение продукта</label>
                         <input type="file" class="form-control" id="editProductImage" name="image" accept="image/avif,image/webp">
                         <div class="form-text">Загрузите новое изображение (типо AVIF или WebP, макс. размер 100KB) или оставьте пустым, если не хотите менять изображение.</div>
+                    </div>
+                    <div class="mb-3">
+                        <label for="editProductQuantity" class="form-label">Количество</label>
+                        <input type="number" class="form-control" id="editProductQuantity" name="quantity" min="1">
+                    </div>
+                    <div class="mb-3">
+                        <label for="editProductWeight" class="form-label">Вес (г)</label>
+                        <input type="number" class="form-control" id="editProductWeight" name="weight" min="0">
                     </div>
                     <div class="mb-3">
                         <label for="editProductStatus" class="form-label">Статус продукта</label>
@@ -204,6 +218,10 @@
                 }
                 
                 document.getElementById('editProductStatus').value = status;
+                
+                // Устанавливаем количество и вес
+                document.getElementById('editProductQuantity').value = this.dataset.quantity;
+                document.getElementById('editProductWeight').value = this.dataset.weight;
             });
         });
         

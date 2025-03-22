@@ -66,6 +66,20 @@
                             </div>
                         </div>
                         
+                        <div class="row">
+                            <div class="col-md-6 mb-3">
+                                <label for="productQuantity" class="form-label">Количество</label>
+                                <input type="number" class="form-control" id="productQuantity" name="quantity" min="1" value="1" required>
+                                <div class="form-text">Укажите доступное количество товара</div>
+                            </div>
+                            
+                            <div class="col-md-6 mb-3">
+                                <label for="productWeight" class="form-label">Вес (г)</label>
+                                <input type="number" class="form-control" id="productWeight" name="weight" min="0" value="0">
+                                <div class="form-text">Укажите вес товара в граммах</div>
+                            </div>
+                        </div>
+                        
                         <div class="mb-3">
                             <label for="productImage" class="form-label">Изображение продукта</label>
                             <input type="file" class="form-control" id="productImage" name="image" accept="image/avif,image/webp">
@@ -110,6 +124,8 @@ document.addEventListener('DOMContentLoaded', function() {
         const description = document.getElementById('productDescription').value.trim();
         const price = document.getElementById('productPrice').value;
         const image = document.getElementById('productImage').files[0];
+        const quantity = document.getElementById('productQuantity').value;
+        const weight = document.getElementById('productWeight').value;
         
         // Проверка названия
         if (name.length === 0 || name.length > 100) {
@@ -127,6 +143,12 @@ document.addEventListener('DOMContentLoaded', function() {
         if (price <= 0) {
             isValid = false;
             alert('Цена должна быть больше нуля');
+        }
+        
+        // Проверка количества
+        if (quantity < 1) {
+            isValid = false;
+            alert('Количество должно быть больше нуля');
         }
         
         // Проверка файла изображения, если он был выбран

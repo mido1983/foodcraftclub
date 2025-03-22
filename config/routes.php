@@ -77,7 +77,7 @@ $router->get('/seller/products', [SellerDashboardController::class, 'products'])
 $router->get('/seller/products/fix-images', [SellerDashboardController::class, 'fixProductImages']);
 $router->get('/seller/products/new', [SellerDashboardController::class, 'newProduct']); 
 $router->post('/seller/products/add', [SellerDashboardController::class, 'addProduct']);
-$router->post('/seller/products/edit', [SellerDashboardController::class, 'editProduct']);
+$router->post('/seller/products/edit', [SellerDashboardController::class, 'updateProduct']);
 $router->post('/seller/products/delete', [SellerDashboardController::class, 'deleteProduct']);
 $router->get('/seller/orders', [SellerDashboardController::class, 'orders']);
 $router->get('/seller/profile', [SellerDashboardController::class, 'profile']);
