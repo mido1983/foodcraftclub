@@ -19,6 +19,10 @@ class Application {
     public Logger $logger;
     public ErrorHandler $errorHandler;
 
+    /**
+     * Initialize application with dependencies
+     * @param string $rootPath Root path of the application
+     */
     public function __construct(public string $rootPath) {
         self::$app = $this;
         $this->request = new Request();
@@ -29,23 +33,27 @@ class Application {
         $this->view = new View();
         $this->logger = new Logger();
         
-        // Инициализируем обработчик ошибок
-        $this->errorHandler = new ErrorHandler($this->logger, false); // false для продакшена, true для разработки
+        // Initialize error handler
+        $this->errorHandler = new ErrorHandler($this->logger, false); // false for production, true for development
         
         // Register global middlewares
         $this->router->middleware(new AdminRouteMiddleware());
     }
 
-    public function run() {
+    /**
+     * Run the application
+     * @return void
+     */
+    public function run(): void {
         try {
-            // Логгируем запуск приложения
-            $this->logger->info('Запуск приложения', ['uri' => $_SERVER['REQUEST_URI']], 'app.log');
+            // Log application start
+            $this->logger->info('Application started', ['uri' => $_SERVER['REQUEST_URI']], 'app.log');
             
             echo $this->router->resolve();
         } catch (ForbiddenException $e) {
-            // Логгируем ошибку доступа
+            // Log access error
             $this->logger->warning(
-                'Ошибка доступа: ' . $e->getMessage(),
+                'Access error: ' . $e->getMessage(),
                 ['uri' => $_SERVER['REQUEST_URI'], 'trace' => $e->getTraceAsString()],
                 'errors.log'
             );
@@ -55,9 +63,9 @@ class Application {
                 'exception' => $e
             ]);
         } catch (\Exception $e) {
-            // Логгируем общую ошибку
+            // Log general error
             $this->logger->error(
-                'Ошибка приложения: ' . $e->getMessage(),
+                'Application error: ' . $e->getMessage(),
                 ['uri' => $_SERVER['REQUEST_URI'], 'trace' => $e->getTraceAsString()],
                 'errors.log'
             );
@@ -69,11 +77,19 @@ class Application {
         }
     }
 
-    public function getController() {
+    /**
+     * Get the current controller
+     * @return Controller|null
+     */
+    public function getController(): ?Controller {
         return $this->controller;
     }
 
-    public function setController(Controller $controller) {
+    /**
+     * Set the current controller
+     * @param Controller $controller
+     */
+    public function setController(Controller $controller): void {
         $this->controller = $controller;
     }
 }

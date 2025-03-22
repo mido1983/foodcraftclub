@@ -4,6 +4,7 @@ use App\Controllers\SiteController;
 use App\Controllers\AuthController;
 use App\Controllers\AdminController;
 use App\Controllers\SellerDashboardController;
+use App\Controllers\CatalogController;
 
 /** @var \App\Core\Router $router */
 
@@ -25,6 +26,10 @@ $router->get('/admin/users/edit/{id}', [AdminController::class, 'editUser']);
 $router->post('/admin/users/edit/{id}', [AdminController::class, 'editUser']);
 $router->post('/admin/users/delete/{id}', [AdminController::class, 'deleteUser']);
 $router->get('/admin/clear-cache', [AdminController::class, 'clearCache']);
+
+// Catalog routes
+$router->get('/catalog', [CatalogController::class, 'index']);
+$router->post('/catalog/getProducts', [CatalogController::class, 'getProducts']);
 
 // Debug route (temporary)
 $router->get('/debug/logs', function() {

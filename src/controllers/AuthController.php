@@ -14,7 +14,11 @@ class AuthController extends Controller {
         $this->registerMiddleware(new AuthMiddleware(['register'], ['admin']));
     }
 
-    public function login() {
+    /**
+     * Handle user login
+     * @return string|void
+     */
+    public function login(): string|null {
         $this->view->title = 'Login';
         
         if (Application::$app->request->isPost()) {
@@ -76,7 +80,11 @@ class AuthController extends Controller {
         return $this->render('auth/login');
     }
     
-    public function register() {
+    /**
+     * Handle user registration (admin only)
+     * @return string|null
+     */
+    public function register(): string|null {
         // Only admin can access this page
         if (!Application::$app->session->hasRole('admin')) {
             Application::$app->session->setFlash('error', 'You do not have permission to access this page');
@@ -136,12 +144,21 @@ class AuthController extends Controller {
         return $this->render('auth/register');
     }
     
-    public function logout() {
+    /**
+     * Handle user logout
+     * @return null
+     */
+    public function logout(): ?string {
         Application::$app->session->destroy();
         Application::$app->session->setFlash('success', 'You have been logged out');
         return Application::$app->response->redirect('/');
     }
     
+    /**
+     * Validate registration data
+     * @param array $data Registration form data
+     * @return array List of validation errors
+     */
     private function validateRegistration(array $data): array {
         $errors = [];
         

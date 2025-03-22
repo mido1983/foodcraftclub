@@ -1,51 +1,116 @@
 <?php
+declare(strict_types=1);
 
 namespace App\Controllers;
 
 use App\Core\Controller;
 use App\Core\Application;
 use App\Core\Middleware\AuthMiddleware;
+use App\Models\User;
 
 abstract class DashboardController extends Controller {
+    /**
+     * Constructor - registers middleware for authentication
+     */
     public function __construct() {
         parent::__construct();
         $this->registerMiddleware(new AuthMiddleware());
     }
 
-    protected function getUserProfile() {
-        return Application::$app->session->getUser();
+    /**
+     * Get the current user profile
+     * @return User|null Current authenticated user
+     */
+    protected function getUserProfile(): ?User {
+        try {
+            return Application::$app->session->getUser();
+        } catch (\Exception $e) {
+            // Log error to errors.log
+            Application::$app->logger->error(
+                'Error getting user profile: ' . $e->getMessage(),
+                ['trace' => $e->getTraceAsString()],
+                'errors.log'
+            );
+            return null;
+        }
     }
 
-    protected function getNotifications() {
-        $user = $this->getUserProfile();
-        $statement = Application::$app->db->prepare("
-            SELECT * FROM notifications 
-            WHERE user_id = :user_id 
-            ORDER BY created_at DESC 
-            LIMIT 10
-        ");
-        $statement->execute(['user_id' => $user->id]);
-        return $statement->fetchAll();
+    /**
+     * Get recent notifications for the current user
+     * @return array List of notifications
+     */
+    protected function getNotifications(): array {
+        try {
+            $user = $this->getUserProfile();
+            if (!$user) {
+                return [];
+            }
+            
+            $statement = Application::$app->db->prepare("
+                SELECT * FROM notifications 
+                WHERE user_id = :user_id 
+                ORDER BY created_at DESC 
+                LIMIT 10
+            ");
+            $statement->execute(['user_id' => $user->id]);
+            return $statement->fetchAll();
+        } catch (\Exception $e) {
+            // Log error to errors.log
+            Application::$app->logger->error(
+                'Error getting notifications: ' . $e->getMessage(),
+                ['trace' => $e->getTraceAsString()],
+                'errors.log'
+            );
+            return [];
+        }
     }
 
-    protected function getUnreadNotificationsCount() {
-        $user = $this->getUserProfile();
-        $statement = Application::$app->db->prepare("
-            SELECT COUNT(*) as count 
-            FROM notifications 
-            WHERE user_id = :user_id AND is_read = 0
-        ");
-        $statement->execute(['user_id' => $user->id]);
-        return $statement->fetch()['count'] ?? 0;
+    /**
+     * Get count of unread notifications for the current user
+     * @return int Count of unread notifications
+     */
+    protected function getUnreadNotificationsCount(): int {
+        try {
+            $user = $this->getUserProfile();
+            if (!$user) {
+                return 0;
+            }
+            
+            $statement = Application::$app->db->prepare("
+                SELECT COUNT(*) as count 
+                FROM notifications 
+                WHERE user_id = :user_id AND is_read = 0
+            ");
+            $statement->execute(['user_id' => $user->id]);
+            return (int)($statement->fetch()['count'] ?? 0);
+        } catch (\Exception $e) {
+            // Log error to errors.log
+            Application::$app->logger->error(
+                'Error getting unread notifications count: ' . $e->getMessage(),
+                ['trace' => $e->getTraceAsString()],
+                'errors.log'
+            );
+            return 0;
+        }
     }
     
     /**
-     * u041fu0435u0440u0435u043du0430u043fu0440u0430u0432u043bu0435u043du0438u0435 u043du0430 u0434u0440u0443u0433u043eu0439 URL
-     * @param string $url URL u0434u043bu044f u043fu0435u0440u0435u043du0430u043fu0440u0430u0432u043bu0435u043du0438u044f
-     * @return string u041fu0443u0441u0442u0430u044f u0441u0442u0440u043eu043au0430 u0434u043bu044f u0441u043eu0432u043cu0435u0441u0442u0438u043cu043eu0441u0442u0438 u0441 u043cu0435u0442u043eu0434u0430u043cu0438, u043au043eu0442u043eu0440u044bu0435 u0432u043eu0437u0432u0440u0430u0449u0430u044eu0442 u0441u0442u0440u043eu043au0443
+     * Redirect to another URL
+     * @param string $url URL to redirect to
+     * @return string Empty string for compatibility with methods that return string
      */
     protected function redirect(string $url): string {
-        Application::$app->response->redirect($url);
-        return '';
+        try {
+            Application::$app->response->redirect($url);
+            return '';
+        } catch (\Exception $e) {
+            // Log error to errors.log
+            Application::$app->logger->error(
+                'Error redirecting to ' . $url . ': ' . $e->getMessage(),
+                ['trace' => $e->getTraceAsString()],
+                'errors.log'
+            );
+            return '';
+        }
     }
 }

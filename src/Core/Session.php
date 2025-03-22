@@ -11,6 +11,9 @@ class Session {
 
     private ?User $user = null;
 
+    /**
+     * Initialize session and load user data if available
+     */
     public function __construct() {
         session_start();
         $flashMessages = $_SESSION[self::FLASH_KEY] ?? [];
@@ -26,30 +29,62 @@ class Session {
         }
     }
 
-    public function setFlash($key, $message) {
+    /**
+     * Set flash message
+     * @param string $key Message key
+     * @param string $message Message content
+     * @return void
+     */
+    public function setFlash(string $key, string $message): void {
         $_SESSION[self::FLASH_KEY][$key] = [
             'remove' => false,
             'value' => $message
         ];
     }
 
-    public function getFlash($key) {
+    /**
+     * Get flash message by key
+     * @param string $key Message key
+     * @return string|false Message content or false if not found
+     */
+    public function getFlash(string $key): string|false {
         return $_SESSION[self::FLASH_KEY][$key]['value'] ?? false;
     }
 
-    public function set($key, $value) {
+    /**
+     * Set session value
+     * @param string $key Session key
+     * @param mixed $value Session value
+     * @return void
+     */
+    public function set(string $key, mixed $value): void {
         $_SESSION[$key] = $value;
     }
 
-    public function get($key) {
+    /**
+     * Get session value
+     * @param string $key Session key
+     * @return mixed Session value or false if not found
+     */
+    public function get(string $key): mixed {
         return $_SESSION[$key] ?? false;
     }
 
-    public function remove($key) {
+    /**
+     * Remove session value
+     * @param string $key Session key
+     * @return void
+     */
+    public function remove(string $key): void {
         unset($_SESSION[$key]);
     }
 
-    public function setUser(?User $user) {
+    /**
+     * Set user data
+     * @param User|null $user User object or null to remove user data
+     * @return void
+     */
+    public function setUser(?User $user): void {
         $this->user = $user;
         if ($user) {
             $this->set(self::USER_KEY, $user->id);
@@ -60,6 +95,10 @@ class Session {
         }
     }
 
+    /**
+     * Get user data
+     * @return User|null User object or null if no user is logged in
+     */
     public function getUser(): ?User {
         return $this->user;
     }
@@ -73,28 +112,54 @@ class Session {
         return $this->user ? $this->user->id : null;
     }
 
-    public function setRoles(array $roles) {
+    /**
+     * Set user roles
+     * @param array $roles Array of role names
+     * @return void
+     */
+    public function setRoles(array $roles): void {
         $this->set(self::ROLES_KEY, array_column($roles, 'name'));
     }
 
+    /**
+     * Get user roles
+     * @return array Array of role names
+     */
     public function getRoles(): array {
         return $this->get(self::ROLES_KEY) ?? [];
     }
 
+    /**
+     * Check if user has a specific role
+     * @param string $role Role name
+     * @return bool True if user has the role, false otherwise
+     */
     public function hasRole(string $role): bool {
         $roles = $this->getRoles();
         return in_array($role, $roles);
     }
 
+    /**
+     * Check if user is logged in
+     * @return bool True if user is logged in, false otherwise
+     */
     public function isLoggedIn(): bool {
         return $this->user !== null;
     }
 
-    public function destroy() {
+    /**
+     * Destroy session
+     * @return void
+     */
+    public function destroy(): void {
         session_destroy();
         $this->user = null;
     }
 
+    /**
+     * Remove flash messages on object destruction
+     * @return void
+     */
     public function __destruct() {
         $flashMessages = $_SESSION[self::FLASH_KEY] ?? [];
         foreach ($flashMessages as $key => $flashMessage) {

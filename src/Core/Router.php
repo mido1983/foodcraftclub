@@ -11,23 +11,23 @@ class Router {
         private Response $response
     ) {}
 
-    public function get(string $path, $callback) {
+    public function get(string $path, $callback): self {
         $this->routes['get'][$path] = $callback;
         return $this;
     }
 
-    public function post(string $path, $callback) {
+    public function post(string $path, $callback): self {
         $this->routes['post'][$path] = $callback;
         return $this;
     }
 
-    public function middleware($middleware) {
+    public function middleware($middleware): self {
         $this->middlewares[] = $middleware;
         return $this;
     }
 
     /**
-     * Получить все зарегистрированные маршруты
+     * Get all registered routes
      * 
      * @return array
      */
@@ -36,7 +36,7 @@ class Router {
     }
 
     /**
-     * Проверить, соответствует ли маршрут пути
+     * Check if a route matches a path
      * 
      * @param string $route
      * @param string $path
@@ -52,17 +52,17 @@ class Router {
     }
 
     /**
-     * Найти подходящий маршрут для пути и метода
+     * Find matching route for path and method
      * 
      * @param string $path
      * @param string $method
      * @return array|null
      */
     public function findMatchingRoute(string $path, string $method): ?array {
-        // Приводим метод к нижнему регистру для соответствия ключам в массиве routes
+        // Convert method to lowercase to match keys in routes array
         $method = strtolower($method);
         
-        // Проверяем точное совпадение
+        // Check for exact match
         if (isset($this->routes[$method][$path])) {
             return [
                 'callback' => $this->routes[$method][$path],
@@ -70,7 +70,7 @@ class Router {
             ];
         }
         
-        // Проверяем динамические маршруты
+        // Check dynamic routes
         foreach ($this->routes[$method] ?? [] as $route => $handler) {
             if ($this->matchRoute($route, $path)) {
                 return [
@@ -93,27 +93,16 @@ class Router {
             $middleware($this->request, $this->response);
         }
         
-        // Check for exact match first
-        $callback = $this->routes[$method][$path] ?? false;
-        $params = [];
+        // Find matching route
+        $matchingRoute = $this->findMatchingRoute($path, $method);
         
-        // If no exact match, check for dynamic routes
-        if (!$callback) {
-            foreach ($this->routes[$method] ?? [] as $route => $handler) {
-                $routePattern = $this->convertRouteToRegex($route);
-                if (preg_match($routePattern, $path, $matches)) {
-                    $callback = $handler;
-                    // Extract named parameters
-                    $params = $this->extractParams($route, $path);
-                    break;
-                }
-            }
-        }
-
-        if (!$callback) {
+        if (!$matchingRoute) {
             $this->response->setStatusCode(404);
             return $this->renderView('_404');
         }
+        
+        $callback = $matchingRoute['callback'];
+        $params = $matchingRoute['params'];
 
         if (is_array($callback)) {
             /** @var \App\Core\Controller $controller */
@@ -123,8 +112,12 @@ class Router {
             $callback[0] = $controller;
 
             // Execute controller middlewares BEFORE calling the action
+            // This is critical for security - ensures all middleware checks are performed
             foreach ($controller->getMiddlewares() as $middleware) {
-                $middleware->execute();
+                // If middleware returns false, stop execution
+                if ($middleware->execute() === false) {
+                    return $this->response->redirect('/login');
+                }
             }
         }
 
@@ -174,11 +167,11 @@ class Router {
         return $params;
     }
 
-    public function renderView($view, $params = []) {
+    public function renderView($view, $params = []): string {
         return Application::$app->view->renderView($view, $params);
     }
 
-    public function renderContent($viewContent) {
+    public function renderContent($viewContent): string {
         return Application::$app->view->renderContent($viewContent);
     }
 }
