@@ -143,6 +143,18 @@ class User extends DbModel {
         try {
             $db->beginTransaction();
 
+            // Check if user had seller role before the update
+            // Пройдемся к базе данных для проверки роли продавца
+            $sellerRoleId = 2; // ID роли продавца
+            $checkRoleStmt = $db->prepare("SELECT 1 FROM user_roles WHERE user_id = :user_id AND role_id = :role_id");
+            $checkRoleStmt->execute([
+                'user_id' => $this->id,
+                'role_id' => $sellerRoleId
+            ]);
+            $hadSellerRole = (bool)$checkRoleStmt->fetchColumn();
+            
+            Application::$app->logger->info('User ID ' . $this->id . ' had seller role before update: ' . ($hadSellerRole ? 'yes' : 'no'), ['user_id' => $this->id], 'users.log');
+            
             // Delete existing roles
             $statement = $db->prepare("DELETE FROM user_roles WHERE user_id = :user_id");
             $statement->execute(['user_id' => $this->id]);
@@ -160,12 +172,76 @@ class User extends DbModel {
                 ]);
                 Application::$app->logger->info('Added role ID ' . $roleId . ' for user ID ' . $this->id . ': ' . ($result ? 'success' : 'failed'), ['user_id' => $this->id], 'users.log');
             }
-
-            $db->commit();
-            Application::$app->logger->info('Committed role changes for user ID: ' . $this->id, ['user_id' => $this->id], 'users.log');
             
             // Clear the cached roles so they'll be reloaded on next getRoles() call
             $this->roles = [];
+            
+            // Check if user has seller role after the update
+            // Вместо использования hasRole, который может использовать кэшированные данные,
+            // проверяем напрямую, есть ли роль продавца в новом списке ролей
+            $hasSellerRole = false;
+            $sellerRoleId = 2; // Assuming seller role ID is 2
+            if (in_array($sellerRoleId, $roleIds)) {
+                $hasSellerRole = true;
+            }
+            
+            // If user was given seller role and didn't have it before, create seller profile
+            if ($hasSellerRole && !$hadSellerRole) {
+                Application::$app->logger->info('User ID ' . $this->id . ' was given seller role, creating seller profile', ['user_id' => $this->id], 'users.log');
+                
+                // Check if seller profile already exists
+                $checkStmt = $db->prepare("SELECT id FROM seller_profiles WHERE user_id = :user_id");
+                $checkStmt->execute(['user_id' => $this->id]);
+                $existingProfile = $checkStmt->fetch(PDO::FETCH_ASSOC);
+                
+                if (!$existingProfile) {
+                    // Create seller profile with all necessary fields
+                    $createStmt = $db->prepare("
+                        INSERT INTO seller_profiles (
+                            user_id, seller_type, min_order_amount, 
+                            name, description, email, phone, avatar_url
+                        )
+                        VALUES (
+                            :user_id, 'ordinary', 0, 
+                            :name, :description, :email, :phone, ''
+                        )
+                    ");
+                    
+                    // Use user's full name and email for initial seller profile
+                    $result = $createStmt->execute([
+                        'user_id' => $this->id,
+                        'name' => $this->full_name . "'s Shop",
+                        'description' => 'Welcome to my shop!',
+                        'email' => $this->email,
+                        'phone' => ''
+                    ]);
+                    
+                    if ($result) {
+                        Application::$app->logger->info('Created seller profile for user ID: ' . $this->id, ['user_id' => $this->id], 'users.log');
+                    } else {
+                        Application::$app->logger->error('Failed to create seller profile for user ID: ' . $this->id, ['user_id' => $this->id], 'errors.log');
+                    }
+                } else {
+                    Application::$app->logger->info('Seller profile already exists for user ID: ' . $this->id, ['user_id' => $this->id], 'users.log');
+                }
+            }
+            // If user lost seller role, handle accordingly (optionally delete seller profile)
+            else if (!$hasSellerRole && $hadSellerRole) {
+                Application::$app->logger->info('User ID ' . $this->id . ' lost seller role, deleting seller profile', ['user_id' => $this->id], 'users.log');
+                
+                // Delete seller profile
+                $deleteStmt = $db->prepare("DELETE FROM seller_profiles WHERE user_id = :user_id");
+                $result = $deleteStmt->execute(['user_id' => $this->id]);
+                
+                if ($result) {
+                    Application::$app->logger->info('Deleted seller profile for user ID: ' . $this->id, ['user_id' => $this->id], 'users.log');
+                } else {
+                    Application::$app->logger->error('Failed to delete seller profile for user ID: ' . $this->id, ['user_id' => $this->id], 'errors.log');
+                }
+            }
+
+            $db->commit();
+            Application::$app->logger->info('Committed role changes for user ID: ' . $this->id, ['user_id' => $this->id], 'users.log');
         } catch (\Exception $e) {
             $db->rollBack();
             Application::$app->logger->error('Error setting roles for user ID ' . $this->id . ': ' . $e->getMessage(), ['user_id' => $this->id], 'users.log');

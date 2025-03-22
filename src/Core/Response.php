@@ -24,4 +24,12 @@ class Response {
             header($header);
         }
     }
+    
+    /**
+     * Устанавливает заголовок Content-Type для HTML-страниц с кодировкой UTF-8
+     * Это поможет браузеру правильно интерпретировать кириллические символы
+     */
+    public function setHtmlContentType() {
+        header('Content-Type: text/html; charset=UTF-8');
+    }
 }

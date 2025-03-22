@@ -125,6 +125,8 @@ class AuthController extends Controller {
                             // Always set roles to ensure they're properly assigned
                             $user->setRoles($selectedRoles);
                             
+                            // Профиль продавца создается автоматически в методе setRoles класса User
+                            
                             Application::$app->session->setFlash('success', 'User created successfully!');
                             return Application::$app->response->redirect('/admin/users');
                         } else {

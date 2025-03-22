@@ -25,6 +25,7 @@ $router->post('/admin/users/create', [AuthController::class, 'register']);
 $router->get('/admin/users/edit/{id}', [AdminController::class, 'editUser']);
 $router->post('/admin/users/edit/{id}', [AdminController::class, 'editUser']);
 $router->post('/admin/users/delete/{id}', [AdminController::class, 'deleteUser']);
+$router->get('/admin/users/manage-seller-profile/{id}', [AdminController::class, 'manageSellerProfile']);
 $router->get('/admin/clear-cache', [AdminController::class, 'clearCache']);
 
 // Catalog routes

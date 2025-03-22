@@ -49,6 +49,9 @@ class Application {
             // Log application start
             $this->logger->info('Application started', ['uri' => $_SERVER['REQUEST_URI']], 'app.log');
             
+            // Set HTML content type with UTF-8 encoding for all pages
+            $this->response->setHtmlContentType();
+            
             echo $this->router->resolve();
         } catch (ForbiddenException $e) {
             // Log access error

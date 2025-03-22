@@ -240,6 +240,62 @@ class AdminController extends Controller {
                                     'users.log'
                                 );
                                 
+                                // Автоматически создаем или удаляем профиль продавца при изменении роли
+                                if ($roleName === 'seller') {
+                                    // Проверяем, существует ли профиль продавца
+                                    $profileStmt = $db->prepare("SELECT * FROM seller_profiles WHERE user_id = :user_id");
+                                    $profileStmt->execute(['user_id' => $user->id]);
+                                    $hasSellerProfile = (bool)$profileStmt->fetch(PDO::FETCH_ASSOC);
+                                    
+                                    // Если профиля продавца нет, создаем его
+                                    if (!$hasSellerProfile) {
+                                        $createStmt = $db->prepare("
+                                            INSERT INTO seller_profiles (user_id, seller_type, min_order_amount)
+                                            VALUES (:user_id, 'ordinary', 0)
+                                        ");
+                                        $result = $createStmt->execute(['user_id' => $user->id]);
+                                        
+                                        if ($result) {
+                                            Application::$app->logger->info(
+                                                'Профиль продавца автоматически создан при смене роли', 
+                                                ['user_id' => $user->id],
+                                                'users.log'
+                                            );
+                                        } else {
+                                            Application::$app->logger->error(
+                                                'Ошибка при автоматическом создании профиля продавца', 
+                                                ['user_id' => $user->id],
+                                                'errors.log'
+                                            );
+                                        }
+                                    }
+                                } elseif ($roleName !== 'seller') {
+                                    // Проверяем, существует ли профиль продавца
+                                    $profileStmt = $db->prepare("SELECT * FROM seller_profiles WHERE user_id = :user_id");
+                                    $profileStmt->execute(['user_id' => $user->id]);
+                                    $hasSellerProfile = (bool)$profileStmt->fetch(PDO::FETCH_ASSOC);
+                                    
+                                    // Если профиль продавца есть, удаляем его
+                                    if ($hasSellerProfile) {
+                                        $deleteStmt = $db->prepare("DELETE FROM seller_profiles WHERE user_id = :user_id");
+                                        $result = $deleteStmt->execute(['user_id' => $user->id]);
+                                        
+                                        if ($result) {
+                                            Application::$app->logger->info(
+                                                'Профиль продавца автоматически удален при смене роли', 
+                                                ['user_id' => $user->id],
+                                                'users.log'
+                                            );
+                                        } else {
+                                            Application::$app->logger->error(
+                                                'Ошибка при автоматическом удалении профиля продавца', 
+                                                ['user_id' => $user->id],
+                                                'errors.log'
+                                            );
+                                        }
+                                    }
+                                }
+                                
                                 // Create success message with role and status information
                                 $statusLabel = '';
                                 switch ($user->status) {
@@ -379,6 +435,118 @@ class AdminController extends Controller {
                 'errors.log'
             );
             Application::$app->session->setFlash('error', 'An error occurred while deleting the user. Please try again.');
+            return Application::$app->response->redirect('/admin/users');
+        }
+    }
+    
+    /**
+     * Создать или удалить профиль продавца для пользователя
+     * @param int $id ID пользователя
+     * @return string Редирект на страницу пользователей
+     */
+    public function manageSellerProfile(int $id): string {
+        try {
+            $db = Application::$app->db;
+            
+            // Проверяем, существует ли пользователь
+            $userStmt = $db->prepare("SELECT id, email, full_name FROM users WHERE id = :id");
+            $userStmt->execute(['id' => $id]);
+            $user = $userStmt->fetch(PDO::FETCH_ASSOC);
+            
+            if (!$user) {
+                Application::$app->session->setFlash('error', 'Пользователь не найден');
+                return Application::$app->response->redirect('/admin/users');
+            }
+            
+            // Проверяем, есть ли у пользователя роль продавца
+            $rolesStmt = $db->prepare("
+                SELECT r.* FROM roles r
+                JOIN user_roles ur ON ur.role_id = r.id
+                WHERE ur.user_id = :user_id AND r.name = 'seller'
+            ");
+            $rolesStmt->execute(['user_id' => $id]);
+            $hasSellerRole = (bool)$rolesStmt->fetch(PDO::FETCH_ASSOC);
+            
+            // Проверяем, существует ли профиль продавца
+            $profileStmt = $db->prepare("SELECT * FROM seller_profiles WHERE user_id = :user_id");
+            $profileStmt->execute(['user_id' => $id]);
+            $hasSellerProfile = (bool)$profileStmt->fetch(PDO::FETCH_ASSOC);
+            
+            // Логируем текущее состояние
+            Application::$app->logger->info(
+                'Управление профилем продавца', 
+                [
+                    'user_id' => $id, 
+                    'has_seller_role' => $hasSellerRole ? 'yes' : 'no',
+                    'has_seller_profile' => $hasSellerProfile ? 'yes' : 'no'
+                ],
+                'users.log'
+            );
+            
+            // Если у пользователя есть роль продавца, но нет профиля - создаем профиль
+            if ($hasSellerRole && !$hasSellerProfile) {
+                $createStmt = $db->prepare("
+                    INSERT INTO seller_profiles (user_id, seller_type, min_order_amount)
+                    VALUES (:user_id, 'ordinary', 0)
+                ");
+                $result = $createStmt->execute(['user_id' => $id]);
+                
+                if ($result) {
+                    Application::$app->session->setFlash('success', 'Профиль продавца успешно создан');
+                    Application::$app->logger->info(
+                        'Профиль продавца создан', 
+                        ['user_id' => $id],
+                        'users.log'
+                    );
+                } else {
+                    Application::$app->session->setFlash('error', 'Ошибка при создании профиля продавца');
+                    Application::$app->logger->error(
+                        'Ошибка при создании профиля продавца', 
+                        ['user_id' => $id],
+                        'errors.log'
+                    );
+                }
+            }
+            // Если у пользователя нет роли продавца, но есть профиль - удаляем профиль
+            elseif (!$hasSellerRole && $hasSellerProfile) {
+                $deleteStmt = $db->prepare("DELETE FROM seller_profiles WHERE user_id = :user_id");
+                $result = $deleteStmt->execute(['user_id' => $id]);
+                
+                if ($result) {
+                    Application::$app->session->setFlash('success', 'Профиль продавца успешно удален');
+                    Application::$app->logger->info(
+                        'Профиль продавца удален', 
+                        ['user_id' => $id],
+                        'users.log'
+                    );
+                } else {
+                    Application::$app->session->setFlash('error', 'Ошибка при удалении профиля продавца');
+                    Application::$app->logger->error(
+                        'Ошибка при удалении профиля продавца', 
+                        ['user_id' => $id],
+                        'errors.log'
+                    );
+                }
+            }
+            // Если состояние уже корректное
+            else {
+                if ($hasSellerRole && $hasSellerProfile) {
+                    Application::$app->session->setFlash('info', 'Профиль продавца уже существует');
+                } else {
+                    Application::$app->session->setFlash('info', 'Пользователь не является продавцом');
+                }
+            }
+            
+            return Application::$app->response->redirect('/admin/users/edit/' . $id);
+            
+        } catch (Exception $e) {
+            Application::$app->logger->error(
+                'Ошибка при управлении профилем продавца: ' . $e->getMessage(), 
+                ['user_id' => $id, 'trace' => $e->getTraceAsString()],
+                'errors.log'
+            );
+            
+            Application::$app->session->setFlash('error', 'Произошла ошибка: ' . $e->getMessage());
             return Application::$app->response->redirect('/admin/users');
         }
     }
