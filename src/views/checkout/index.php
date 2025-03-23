@@ -42,21 +42,12 @@
                         </div>
                         <div class="card-body">
                             <div class="row mb-3">
-                                <div class="col-md-6">
+                                <div class="col-md-12">
                                     <label for="city_id" class="form-label">City</label>
                                     <select class="form-select" id="city_id" name="city_id" required>
                                         <option value="">Select City</option>
                                         <?php foreach ($cities as $city): ?>
                                             <option value="<?= $city['id'] ?>"><?= htmlspecialchars($city['city_name']) ?></option>
-                                        <?php endforeach; ?>
-                                    </select>
-                                </div>
-                                <div class="col-md-6">
-                                    <label for="district_id" class="form-label">District</label>
-                                    <select class="form-select" id="district_id" name="district_id" required disabled>
-                                        <option value="">Select District</option>
-                                        <?php foreach ($districts as $district): ?>
-                                            <option value="<?= $district['id'] ?>" data-city-id="<?= $district['city_id'] ?>"><?= htmlspecialchars($district['district_name']) ?></option>
                                         <?php endforeach; ?>
                                     </select>
                                 </div>
@@ -220,75 +211,9 @@
         // Filter districts based on selected city
         document.getElementById('city_id').addEventListener('change', function() {
             const cityId = this.value;
-            const districtSelect = document.getElementById('district_id');
             
-            // Reset district selection
-            districtSelect.value = '';
-            
-            if (cityId) {
-                // Enable district select
-                districtSelect.disabled = false;
-                
-                // Show only districts for selected city
-                const districtOptions = districtSelect.querySelectorAll('option');
-                let hasValidDistrict = false;
-                
-                districtOptions.forEach(option => {
-                    if (option.value === '') {
-                        // Always show the placeholder option
-                        option.style.display = '';
-                    } else if (option.dataset.cityId === cityId) {
-                        option.style.display = '';
-                        hasValidDistrict = true;
-                    } else {
-                        option.style.display = 'none';
-                    }
-                });
-                
-                // Calculate delivery fees
-                calculateDeliveryFees(cityId, null);
-            } else {
-                // Disable district select if no city selected
-                districtSelect.disabled = true;
-                
-                // Reset delivery fees
-                resetDeliveryFees();
-            }
-        });
-        
-        // Update delivery fees when district changes
-        document.getElementById('district_id').addEventListener('change', function() {
-            const cityId = document.getElementById('city_id').value;
-            const districtId = this.value;
-            
-            if (cityId && districtId) {
-                calculateDeliveryFees(cityId, districtId);
-            }
-        });
-        
-        // Toggle payment method details
-        const paymentMethodInputs = document.querySelectorAll('input[name="payment_method_id"]');
-        const creditCardForm = document.getElementById('credit-card-form');
-        const bankTransferInfo = document.getElementById('bank-transfer-info');
-        
-        paymentMethodInputs.forEach(input => {
-            input.addEventListener('change', function() {
-                const methodId = parseInt(this.value);
-                
-                // Hide all payment details first
-                creditCardForm.classList.add('d-none');
-                bankTransferInfo.classList.add('d-none');
-                
-                // Show relevant payment details based on selection
-                if (methodId === 2) { // Credit/Debit Card
-                    creditCardForm.classList.remove('d-none');
-                } else if (methodId === 3) { // Bank Transfer
-                    bankTransferInfo.classList.remove('d-none');
-                }
-                
-                // Check if selected payment method is available for all sellers
-                validatePaymentMethod(methodId);
-            });
+            // Calculate delivery fees
+            calculateDeliveryFees(cityId, null);
         });
         
         // Calculate delivery fees based on selected city and district
@@ -425,15 +350,39 @@
             }
         }
         
+        // Toggle payment method details
+        const paymentMethodInputs = document.querySelectorAll('input[name="payment_method_id"]');
+        const creditCardForm = document.getElementById('credit-card-form');
+        const bankTransferInfo = document.getElementById('bank-transfer-info');
+        
+        paymentMethodInputs.forEach(input => {
+            input.addEventListener('change', function() {
+                const methodId = parseInt(this.value);
+                
+                // Hide all payment details first
+                creditCardForm.classList.add('d-none');
+                bankTransferInfo.classList.add('d-none');
+                
+                // Show relevant payment details based on selection
+                if (methodId === 2) { // Credit/Debit Card
+                    creditCardForm.classList.remove('d-none');
+                } else if (methodId === 3) { // Bank Transfer
+                    bankTransferInfo.classList.remove('d-none');
+                }
+                
+                // Check if selected payment method is available for all sellers
+                validatePaymentMethod(methodId);
+            });
+        });
+        
         // Form validation before submission
         document.getElementById('checkout-form').addEventListener('submit', function(e) {
             const cityId = document.getElementById('city_id').value;
-            const districtId = document.getElementById('district_id').value;
             const paymentMethod = document.querySelector('input[name="payment_method_id"]:checked');
             
-            if (!cityId || !districtId) {
+            if (!cityId) {
                 e.preventDefault();
-                alert('Please select both city and district for delivery.');
+                alert('Please select a city for delivery.');
                 return false;
             }
             

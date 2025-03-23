@@ -52,7 +52,7 @@ $router->get('/cart/clear', [CartController::class, 'clearCart']);
 
 // Checkout routes
 $router->get('/checkout', [CheckoutController::class, 'index']);
-$router->post('/checkout/process', [CheckoutController::class, 'processOrder']);
+$router->post('/checkout/process', [CheckoutController::class, 'process']);
 $router->get('/checkout/success', [CheckoutController::class, 'success']);
 $router->get('/checkout/cancel', [CheckoutController::class, 'cancel']);
 

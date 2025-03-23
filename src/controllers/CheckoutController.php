@@ -115,7 +115,7 @@ class CheckoutController extends Controller {
             $data = $request->getBody();
             
             // Validate required fields
-            $requiredFields = ['city_id', 'district_id', 'address_line', 'payment_method_id'];
+            $requiredFields = ['city_id', 'address_line', 'payment_method_id'];
             $missingFields = [];
             
             foreach ($requiredFields as $field) {
@@ -172,7 +172,7 @@ class CheckoutController extends Controller {
             
             // Calculate delivery fees
             $cityId = (int)$data['city_id'];
-            $districtId = (int)$data['district_id'];
+            $districtId = (int)($data['district_id'] ?? 0);
             $sellerDeliveryAreas = $this->getSellerDeliveryAreas($sellerIds);
             
             // Create orders for each seller
@@ -190,8 +190,7 @@ class CheckoutController extends Controller {
                     $deliveryFee = 0;
                     if (isset($sellerDeliveryAreas[$sellerId])) {
                         foreach ($sellerDeliveryAreas[$sellerId] as $area) {
-                            if ($area['city_id'] == $cityId && 
-                                ($area['district_id'] == null || $area['district_id'] == $districtId)) {
+                            if ($area['city_id'] == $cityId) {
                                 $deliveryFee = $area['delivery_fee'];
                                 
                                 // Check if order qualifies for free delivery
@@ -298,12 +297,41 @@ class CheckoutController extends Controller {
     }
     
     /**
-     * Get cities from database
+     * Get cities from database based on seller delivery areas
      * @return array Cities
      */
     private function getCities(): array {
-        $sql = "SELECT id, city_name FROM cities ORDER BY city_name ASC";
+        $session = Application::$app->session;
+        $cartItems = $session->get('cart') ?? [];
+        
+        // Extract seller IDs from cart items
+        $sellerIds = [];
+        foreach ($cartItems as $item) {
+            $sellerIds[$item['seller_id']] = $item['seller_id'];
+        }
+        $sellerIds = array_values($sellerIds);
+        
+        if (empty($sellerIds)) {
+            return [];
+        }
+        
+        // Get cities that sellers deliver to
+        $placeholders = implode(',', array_fill(0, count($sellerIds), '?'));
+        
+        $sql = "SELECT DISTINCT c.id, c.city_name 
+               FROM cities c
+               INNER JOIN seller_delivery_areas sda ON sda.city_id = c.id
+               INNER JOIN seller_profiles sp ON sda.seller_profile_id = sp.id
+               WHERE sp.id IN ($placeholders)
+               ORDER BY c.city_name ASC";
+        
         $statement = Application::$app->db->prepare($sql);
+        
+        // Bind seller IDs
+        foreach ($sellerIds as $index => $sellerId) {
+            $statement->bindValue($index + 1, $sellerId);
+        }
+        
         $statement->execute();
         
         return $statement->fetchAll(PDO::FETCH_ASSOC);
