@@ -45,6 +45,10 @@ foreach ($districts as $district) {
                 </div>
             <?php endif; ?>
             
+            <div class="alert alert-info">
+                <p><strong>Note:</strong> The minimum order amount is now a global setting for your store. You can update it in your <a href="/seller/profile">Seller Profile</a>.</p>
+            </div>
+            
             <div class="row mb-4">
                 <div class="col-md-6">
                     <div class="card">
@@ -87,11 +91,12 @@ foreach ($districts as $district) {
                                     </div>
                                     
                                     <div class="mb-3">
-                                        <label for="min_order_amount" class="form-label">Minimum Order Amount</label>
+                                        <label for="free_from_amount" class="form-label">Free Delivery From Amount</label>
                                         <div class="input-group">
                                             <span class="input-group-text">₪</span>
-                                            <input type="number" class="form-control" id="min_order_amount" name="min_order_amount" min="0" step="0.01" value="0">
+                                            <input type="number" class="form-control" id="free_from_amount" name="free_from_amount" min="0" step="0.01" value="0">
                                         </div>
+                                        <div class="form-text">Set to 0 if you don't offer free delivery for this area.</div>
                                     </div>
                                     
                                     <button type="submit" class="btn btn-primary">Add Delivery Area</button>
@@ -119,7 +124,7 @@ foreach ($districts as $district) {
                                                 <th>City</th>
                                                 <th>District</th>
                                                 <th>Delivery Fee</th>
-                                                <th>Min. Order</th>
+                                                <th>Free From</th>
                                                 <th>Actions</th>
                                             </tr>
                                         </thead>

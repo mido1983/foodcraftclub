@@ -49,6 +49,12 @@
                                 </div>
                                 
                                 <div class="mb-3">
+                                    <label for="min_order_amount" class="form-label">Минимальная сумма заказа (шекелей)</label>
+                                    <input type="number" class="form-control" id="min_order_amount" name="min_order_amount" min="0" step="0.01" value="<?= htmlspecialchars($sellerProfile['min_order_amount'] ?? '50.00') ?>">
+                                    <div class="form-text">Минимальная сумма заказа для всего магазина. Если покупатель не достигнет этой суммы, он не сможет оформить заказ.</div>
+                                </div>
+                                
+                                <div class="mb-3">
                                     <label for="email" class="form-label">Контактный email</label>
                                     <input type="email" class="form-control" id="email" name="email" value="<?= htmlspecialchars($sellerProfile['email'] ?? '') ?>">
                                 </div>
