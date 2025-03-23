@@ -314,9 +314,9 @@ class CheckoutController extends Controller {
      * @return array Districts
      */
     private function getDistricts(): array {
-        $sql = "SELECT d.id, d.district_name, d.city_id, c.city_name 
+        $sql = "SELECT d.id, d.district_name, c.id as city_id, c.city_name 
                FROM districts d
-               INNER JOIN cities c ON d.city_id = c.id
+               INNER JOIN cities c ON c.district_id = d.id
                ORDER BY c.city_name ASC, d.district_name ASC";
         $statement = Application::$app->db->prepare($sql);
         $statement->execute();
