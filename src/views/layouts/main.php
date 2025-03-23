@@ -56,7 +56,7 @@
                             </a>
                             <ul class="dropdown-menu dropdown-menu-end">
                                 <li>
-                                    <a class="dropdown-item" href="/profile">
+                                    <a class="dropdown-item" href="/seller/profile">
                                         <i class="bi bi-person"></i> Profile
                                     </a>
                                 </li>
