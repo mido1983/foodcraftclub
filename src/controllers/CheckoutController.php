@@ -162,7 +162,9 @@ class CheckoutController extends Controller {
             
             // Check minimum order amounts
             foreach ($itemsBySeller as $sellerId => $sellerData) {
-                if (isset($sellerProfiles[$sellerId]) && $sellerData['subtotal'] < $sellerProfiles[$sellerId]['min_order_amount']) {
+                if (isset($sellerProfiles[$sellerId]) && 
+                    isset($sellerProfiles[$sellerId]['min_order_amount']) && 
+                    $sellerData['subtotal'] < $sellerProfiles[$sellerId]['min_order_amount']) {
                     $session->setFlash('error', 'Order amount for seller ' . $sellerProfiles[$sellerId]['name'] . 
                                      ' is below minimum required amount of ' . $sellerProfiles[$sellerId]['min_order_amount']);
                     $response->redirect('/checkout');
@@ -172,7 +174,7 @@ class CheckoutController extends Controller {
             
             // Calculate delivery fees
             $cityId = (int)$data['city_id'];
-            $districtId = (int)($data['district_id'] ?? 0);
+            $districtId = !empty($data['district_id']) ? (int)$data['district_id'] : null;
             $sellerDeliveryAreas = $this->getSellerDeliveryAreas($sellerIds);
             
             // Create orders for each seller
@@ -194,7 +196,9 @@ class CheckoutController extends Controller {
                                 $deliveryFee = $area['delivery_fee'];
                                 
                                 // Check if order qualifies for free delivery
-                                if ($area['free_from_amount'] !== null && $sellerData['subtotal'] >= $area['free_from_amount']) {
+                                if (isset($area['free_from_amount']) && 
+                                    $area['free_from_amount'] !== null && 
+                                    $sellerData['subtotal'] >= $area['free_from_amount']) {
                                     $deliveryFee = 0;
                                 }
                                 
@@ -218,7 +222,7 @@ class CheckoutController extends Controller {
                     $orderStmt->bindValue(':total_amount', $totalAmount, PDO::PARAM_STR);
                     $orderStmt->bindValue(':payment_method_id', $paymentMethodId, PDO::PARAM_INT);
                     $orderStmt->bindValue(':city_id', $cityId, PDO::PARAM_INT);
-                    $orderStmt->bindValue(':district_id', $districtId, PDO::PARAM_INT);
+                    $orderStmt->bindValue(':district_id', $districtId, $districtId === null ? PDO::PARAM_NULL : PDO::PARAM_INT);
                     $orderStmt->bindValue(':address_line', $addressLine, PDO::PARAM_STR);
                     $orderStmt->bindValue(':delivery_fee', $deliveryFee, PDO::PARAM_STR);
                     $orderStmt->execute();
@@ -253,7 +257,11 @@ class CheckoutController extends Controller {
                 
             } catch (\Exception $e) {
                 $db->rollBack();
-                Application::$app->logger->error('Checkout error: ' . $e->getMessage());
+                Application::$app->logger->error('Checkout error: ' . $e->getMessage(), [
+                    'trace' => $e->getTraceAsString(),
+                    'data' => $data,
+                    'user_id' => $userId
+                ], 'errors.log');
                 $session->setFlash('error', 'An error occurred during checkout. Please try again.');
                 $response->redirect('/checkout');
             }
@@ -281,8 +289,29 @@ class CheckoutController extends Controller {
         // Get order details
         $orders = $this->getOrdersByIds($orderIds);
         
+        if (empty($orders)) {
+            Application::$app->response->redirect('/cart');
+            return '';
+        }
+        
+        // Get the first order for the success page
+        $order = $orders[0];
+        $orderItems = [];
+        
+        // Prepare order items with seller information
+        foreach ($orders as $orderData) {
+            foreach ($orderData['items'] as $item) {
+                // Add seller information to each item
+                $item['seller_name'] = $orderData['seller_name'];
+                $item['seller_id'] = $orderData['seller_profile_id'];
+                $item['delivery_fee'] = $orderData['delivery_fee'];
+                $orderItems[] = $item;
+            }
+        }
+        
         return $this->render('checkout/success', [
-            'orders' => $orders
+            'order' => $order,
+            'orderItems' => $orderItems
         ]);
     }
     
@@ -488,8 +517,8 @@ class CheckoutController extends Controller {
         $placeholders = implode(',', array_fill(0, count($orderIds), '?'));
         
         // Get orders
-        $orderSql = "SELECT o.*, sp.name as seller_name, pm.method_name as payment_method_name,
-                        c.city_name, d.district_name
+        $orderSql = "SELECT o.*, sp.name as seller_name, pm.method_name as payment_method_name, pm.method_code as payment_method_code,
+                        c.city_name, d.district_name, NOW() as created_at
                      FROM orders o
                      LEFT JOIN seller_profiles sp ON o.seller_profile_id = sp.id
                      LEFT JOIN payment_methods pm ON o.payment_method_id = pm.id
@@ -508,7 +537,7 @@ class CheckoutController extends Controller {
         $orders = $orderStmt->fetchAll(PDO::FETCH_ASSOC);
         
         // Get order items
-        $itemSql = "SELECT oi.*, p.product_name, pi.image_url
+        $itemSql = "SELECT oi.*, p.product_name, p.price as price, pi.image_url
                     FROM order_items oi
                     LEFT JOIN products p ON oi.product_id = p.id
                     LEFT JOIN (SELECT product_id, image_url FROM product_images WHERE is_main = 1) pi ON oi.product_id = pi.product_id
@@ -537,6 +566,14 @@ class CheckoutController extends Controller {
         // Add items to orders
         foreach ($orders as &$order) {
             $order['items'] = $itemsByOrder[$order['id']] ?? [];
+            // Add phone field if it doesn't exist
+            if (!isset($order['phone'])) {
+                $order['phone'] = 'Not provided';
+            }
+            // Add delivery_notes field if it doesn't exist
+            if (!isset($order['delivery_notes'])) {
+                $order['delivery_notes'] = '';
+            }
         }
         
         return $orders;

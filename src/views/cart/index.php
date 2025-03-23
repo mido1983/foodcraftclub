@@ -1,4 +1,4 @@
-<?php
+<?php 
 /** 
  * @var array $cartItems
  * @var array $itemsBySeller
@@ -91,7 +91,7 @@
                                         <?php endforeach; ?>
                                         <tr class="border-top">
                                             <td colspan="3" class="text-end py-3"><strong>Subtotal:</strong></td>
-                                            <td class="text-end py-3"><strong><?= number_format($sellerData['subtotal'], 2) ?> ₪</strong></td>
+                                            <td class="text-end py-3"><strong class="seller-subtotal" data-seller-id="<?= $sellerId ?>"><?= number_format($sellerData['subtotal'], 2) ?> ₪</strong></td>
                                             <td></td>
                                         </tr>
                                     </tbody>
@@ -191,7 +191,7 @@
                     });
                     
                     // Update seller subtotal in UI
-                    const sellerSubtotalElement = sellerBlock.querySelector('tbody tr:last-child td:nth-child(2)');
+                    const sellerSubtotalElement = sellerBlock.querySelector('.seller-subtotal');
                     if (sellerSubtotalElement) {
                         sellerSubtotalElement.textContent = `${sellerSubtotal.toFixed(2)} ₪`;
                     }
@@ -261,7 +261,7 @@
                         });
                         
                         // Update seller subtotal display
-                        const sellerSubtotalElement = sellerBlock.querySelector('tbody tr:last-child td:nth-child(2)');
+                        const sellerSubtotalElement = sellerBlock.querySelector('.seller-subtotal');
                         if (sellerSubtotalElement) {
                             sellerSubtotalElement.textContent = `${sellerSubtotal.toFixed(2)} ₪`;
                         }
@@ -393,43 +393,110 @@
         
         // Update minimum order alert
         function updateMinimumOrderAlert(sellerId, sellerSubtotal) {
-            const minimumOrderAlert = document.querySelector(`.minimum-order-alert[data-seller-id="${sellerId}"]`);
+            const sellerBlock = document.querySelector(`.seller-block[data-seller-id="${sellerId}"]`);
+            if (!sellerBlock) return;
+            
+            // Get minimum order amount from seller profiles
+            let minimumOrderAlert = sellerBlock.querySelector('.minimum-order-alert');
+            const sellerProfiles = <?= json_encode($sellerProfiles) ?>;
+            
+            // Check if this seller has a minimum order requirement
+            if (!sellerProfiles[sellerId] || !sellerProfiles[sellerId].min_order_amount) {
+                return; // No minimum order requirement for this seller
+            }
+            
+            const minAmount = parseFloat(sellerProfiles[sellerId].min_order_amount);
+            if (minAmount <= 0) {
+                return; // No minimum order requirement
+            }
+            
+            const missingAmount = minAmount - sellerSubtotal;
+            
+            // If there's no alert but we need one, create it
             if (!minimumOrderAlert) {
-                return; // Уведомление не найдено, возможно, продавец уже достиг минимального заказа
-            }
-            
-            const minAmount = parseFloat(minimumOrderAlert.dataset.minAmount);
-            const currentAmount = sellerSubtotal;
-            const missingAmount = minAmount - currentAmount;
-            
-            if (missingAmount <= 0) {
-                minimumOrderAlert.remove();
+                // Create new alert only if we need it
+                if (missingAmount > 0) {
+                    // Create new alert
+                    const alertDiv = document.createElement('div');
+                    alertDiv.className = 'alert alert-warning m-3 mb-0 minimum-order-alert';
+                    alertDiv.dataset.sellerId = sellerId;
+                    alertDiv.dataset.minAmount = minAmount;
+                    
+                    alertDiv.innerHTML = `
+                        <p class="mb-1"><strong>Minimum order amount: ${minAmount.toLocaleString('ru-RU', { minimumFractionDigits: 2, maximumFractionDigits: 2 })} ₪</strong></p>
+                        <p class="mb-0">Current total: <span class="current-amount">${sellerSubtotal.toLocaleString('ru-RU', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}</span> ₪ <br>
+                        You need to add <span class="missing-amount">${missingAmount.toLocaleString('ru-RU', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}</span> ₪ more to proceed with checkout.</p>
+                    `;
+                    
+                    // Insert after header
+                    const cardHeader = sellerBlock.querySelector('.card-header');
+                    cardHeader.insertAdjacentElement('afterend', alertDiv);
+                    
+                    minimumOrderAlert = alertDiv;
+                }
             } else {
-                minimumOrderAlert.querySelector('.current-amount').textContent = `${currentAmount.toLocaleString('ru-RU', { minimumFractionDigits: 2, maximumFractionDigits: 2 })} ₪`;
-                minimumOrderAlert.querySelector('.missing-amount').textContent = `${missingAmount.toLocaleString('ru-RU', { minimumFractionDigits: 2, maximumFractionDigits: 2 })} ₪`;
+                // Only remove the alert if all items from this seller are removed
+                // Otherwise, update the amounts
+                const remainingItems = sellerBlock.querySelectorAll('.cart-item');
+                if (remainingItems.length === 0) {
+                    minimumOrderAlert.remove();
+                } else {
+                    // Always update the current and missing amounts
+                    minimumOrderAlert.querySelector('.current-amount').textContent = sellerSubtotal.toLocaleString('ru-RU', { minimumFractionDigits: 2, maximumFractionDigits: 2 });
+                    minimumOrderAlert.querySelector('.missing-amount').textContent = Math.max(0, missingAmount).toLocaleString('ru-RU', { minimumFractionDigits: 2, maximumFractionDigits: 2 });
+                    
+                    // Never hide the alert unless all items are removed
+                    minimumOrderAlert.style.display = 'block';
+                }
             }
+            
+            // Update the checkout button state
+            checkAllMinimumOrdersMet();
         }
         
         // Check if all minimum orders are met
         function checkAllMinimumOrdersMet() {
-            const minimumOrderAlerts = document.querySelectorAll('.minimum-order-alert');
+            const sellerBlocks = document.querySelectorAll('.seller-block');
             const proceedToCheckoutButton = document.querySelector('#proceed-to-checkout');
+            const warningMessage = document.querySelector('.alert-warning.mt-3');
             
             if (!proceedToCheckoutButton) {
                 return; // Кнопка не найдена, возможно, корзина пуста
             }
             
-            if (minimumOrderAlerts.length === 0) {
-                proceedToCheckoutButton.removeAttribute('disabled');
-                const warningMessage = document.querySelector('.alert-warning.mt-3');
-                if (warningMessage) {
-                    warningMessage.style.display = 'none';
+            // Check each seller block for minimum order requirements
+            let belowMinimumExists = false;
+            
+            sellerBlocks.forEach(sellerBlock => {
+                const sellerId = sellerBlock.dataset.sellerId;
+                const minimumOrderAlert = sellerBlock.querySelector('.minimum-order-alert');
+                
+                // Skip if no minimum order alert
+                if (!minimumOrderAlert) return;
+                
+                // Get the current subtotal for this seller
+                const sellerSubtotalElement = sellerBlock.querySelector('.seller-subtotal');
+                if (!sellerSubtotalElement) return;
+                
+                const sellerSubtotal = parseFloat(sellerSubtotalElement.textContent.replace(' ₪', '').replace(',', ''));
+                const minAmount = parseFloat(minimumOrderAlert.dataset.minAmount);
+                
+                // If subtotal is less than minimum, disable checkout
+                if (sellerSubtotal < minAmount) {
+                    belowMinimumExists = true;
                 }
-            } else {
+            });
+            
+            // Update checkout button and warning based on minimum order status
+            if (belowMinimumExists) {
                 proceedToCheckoutButton.setAttribute('disabled', 'disabled');
-                const warningMessage = document.querySelector('.alert-warning.mt-3');
                 if (warningMessage) {
                     warningMessage.style.display = 'block';
+                }
+            } else {
+                proceedToCheckoutButton.removeAttribute('disabled');
+                if (warningMessage) {
+                    warningMessage.style.display = 'none';
                 }
             }
         }

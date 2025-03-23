@@ -104,6 +104,8 @@ $router->post('/seller/products/add', [SellerDashboardController::class, 'addPro
 $router->post('/seller/products/edit', [SellerDashboardController::class, 'updateProduct']);
 $router->post('/seller/products/delete', [SellerDashboardController::class, 'deleteProduct']);
 $router->get('/seller/orders', [SellerDashboardController::class, 'orders']);
+$router->get('/seller/orders/{id}', [SellerDashboardController::class, 'viewOrder']);
+$router->post('/seller/orders/{id}/update-status', [SellerDashboardController::class, 'updateOrderStatus']);
 $router->get('/seller/delivery-areas', [SellerDashboardController::class, 'deliveryAreas']);
 $router->post('/seller/delivery-areas/add', [SellerDashboardController::class, 'addDeliveryArea']);
 $router->post('/seller/delivery-areas/delete', [SellerDashboardController::class, 'deleteDeliveryArea']);
