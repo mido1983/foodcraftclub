@@ -537,11 +537,35 @@
         
         // Функция для добавления товара в корзину
         function addToCart(productId) {
-            // TODO: Реализовать добавление товара в корзину
-            console.log('Добавление товара в корзину:', productId);
-            
-            // Показываем уведомление об успешном добавлении
-            showNotification('Товар добавлен в корзину');
+            // Отправляем запрос на сервер для добавления товара в корзину
+            fetch('/cart/add', {
+                method: 'POST',
+                headers: {
+                    'Content-Type': 'application/json',
+                    'X-Requested-With': 'XMLHttpRequest'
+                },
+                body: JSON.stringify({
+                    product_id: productId,
+                    quantity: 1
+                })
+            })
+            .then(response => response.json())
+            .then(data => {
+                if (data.success) {
+                    // Показываем уведомление об успешном добавлении
+                    showNotification('Товар добавлен в корзину');
+                    
+                    // Обновляем счетчик товаров в корзине в шапке сайта
+                    updateCartCounter(data.cart_count, data.cart_total);
+                } else {
+                    // Показываем сообщение об ошибке
+                    showNotification(data.message || 'Ошибка при добавлении товара в корзину', 'danger');
+                }
+            })
+            .catch(error => {
+                console.error('Ошибка при добавлении товара в корзину:', error);
+                showNotification('Произошла ошибка при добавлении товара в корзину', 'danger');
+            });
         }
         
         // Функция для сохранения товара на потом
@@ -554,10 +578,10 @@
         }
         
         // Функция для отображения уведомления
-        function showNotification(message) {
+        function showNotification(message, type = 'success') {
             // Создаем элемент уведомления
             const notification = document.createElement('div');
-            notification.className = 'toast align-items-center text-white bg-success';
+            notification.className = `toast align-items-center text-white bg-${type}`;
             notification.setAttribute('role', 'alert');
             notification.setAttribute('aria-live', 'assertive');
             notification.setAttribute('aria-atomic', 'true');
@@ -585,6 +609,21 @@
             notification.addEventListener('hidden.bs.toast', function() {
                 container.remove();
             });
+        }
+        
+        // Функция для обновления счетчика товаров в корзине
+        function updateCartCounter(count, total) {
+            const cartCountElement = document.getElementById('cart-count');
+            const cartTotalElement = document.getElementById('cart-total');
+            
+            if (cartCountElement) {
+                cartCountElement.textContent = count;
+                cartCountElement.classList.remove('d-none');
+            }
+            
+            if (cartTotalElement) {
+                cartTotalElement.textContent = formatPrice(total);
+            }
         }
         
         // Функция для форматирования цены

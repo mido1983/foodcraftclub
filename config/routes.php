@@ -5,6 +5,8 @@ use App\Controllers\AuthController;
 use App\Controllers\AdminController;
 use App\Controllers\SellerDashboardController;
 use App\Controllers\CatalogController;
+use App\Controllers\CartController;
+use App\Controllers\CheckoutController;
 
 /** @var \App\Core\Router $router */
 
@@ -40,6 +42,19 @@ $router->post('/admin/districts/delete', [AdminController::class, 'deleteDistric
 // Catalog routes
 $router->get('/catalog', [CatalogController::class, 'index']);
 $router->post('/catalog/getProducts', [CatalogController::class, 'getProducts']);
+
+// Cart routes
+$router->get('/cart', [CartController::class, 'index']);
+$router->post('/cart/add', [CartController::class, 'addToCart']);
+$router->post('/cart/update', [CartController::class, 'updateCart']);
+$router->post('/cart/remove', [CartController::class, 'removeFromCart']);
+$router->get('/cart/clear', [CartController::class, 'clearCart']);
+
+// Checkout routes
+$router->get('/checkout', [CheckoutController::class, 'index']);
+$router->post('/checkout/process', [CheckoutController::class, 'processOrder']);
+$router->get('/checkout/success', [CheckoutController::class, 'success']);
+$router->get('/checkout/cancel', [CheckoutController::class, 'cancel']);
 
 // Debug route (temporary)
 $router->get('/debug/logs', function() {

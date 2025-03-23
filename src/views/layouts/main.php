@@ -42,6 +42,33 @@
                     <?php endif; ?>
                 </ul>
                 <ul class="navbar-nav">
+                    <!-- Cart Icon -->
+                    <li class="nav-item me-2">
+                        <a class="nav-link position-relative" href="/cart">
+                            <i class="bi bi-cart3 fs-5"></i>
+                            <?php 
+                            $cartItems = \App\Core\Application::$app->session->get('cart');
+                            $cartCount = 0;
+                            $cartTotal = 0;
+                            
+                            if (is_array($cartItems)) {
+                                $cartCount = count($cartItems);
+                                foreach ($cartItems as $item) {
+                                    $cartTotal += $item['price'] * $item['quantity'];
+                                }
+                            }
+                            ?>
+                            <?php if ($cartCount > 0): ?>
+                                <span id="cart-count" class="position-absolute top-0 start-100 translate-middle badge rounded-pill bg-danger">
+                                    <?= $cartCount ?>
+                                </span>
+                            <?php else: ?>
+                                <span id="cart-count" class="position-absolute top-0 start-100 translate-middle badge rounded-pill bg-danger d-none">
+                                    0
+                                </span>
+                            <?php endif; ?>
+                        </a>
+                    </li>
                     <?php if (!\App\Core\Application::$app->session->isLoggedIn()): ?>
                         <li class="nav-item">
                             <a class="nav-link" href="/login">
