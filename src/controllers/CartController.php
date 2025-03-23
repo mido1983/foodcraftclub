@@ -32,8 +32,55 @@ class CartController extends Controller {
         $cartItems = $this->getCartItems();
         $totalAmount = $this->calculateCartTotal($cartItems);
         
+        // Group items by seller
+        $itemsBySeller = [];
+        $sellerIds = [];
+        $sellerProfiles = [];
+        $belowMinimumSellers = [];
+        
+        if (!empty($cartItems)) {
+            foreach ($cartItems as $item) {
+                $sellerId = $item['seller_id'];
+                $sellerIds[] = $sellerId;
+                
+                if (!isset($itemsBySeller[$sellerId])) {
+                    $itemsBySeller[$sellerId] = [
+                        'seller_id' => $sellerId,
+                        'seller_name' => $item['seller_name'],
+                        'items' => [],
+                        'subtotal' => 0
+                    ];
+                }
+                
+                $itemsBySeller[$sellerId]['items'][] = $item;
+                $itemsBySeller[$sellerId]['subtotal'] += $item['price'] * $item['quantity'];
+            }
+            
+            // Get seller profiles for minimum order amounts
+            if (!empty($sellerIds)) {
+                $sellerProfiles = $this->getSellerProfiles(array_unique($sellerIds));
+                
+                // Check minimum order amounts
+                foreach ($itemsBySeller as $sellerId => $sellerData) {
+                    if (isset($sellerProfiles[$sellerId]) && 
+                        $sellerProfiles[$sellerId]['min_order_amount'] > 0 && 
+                        $sellerData['subtotal'] < $sellerProfiles[$sellerId]['min_order_amount']) {
+                        $belowMinimumSellers[$sellerId] = [
+                            'seller_name' => $sellerProfiles[$sellerId]['name'],
+                            'min_order_amount' => $sellerProfiles[$sellerId]['min_order_amount'],
+                            'current_amount' => $sellerData['subtotal'],
+                            'missing_amount' => $sellerProfiles[$sellerId]['min_order_amount'] - $sellerData['subtotal']
+                        ];
+                    }
+                }
+            }
+        }
+        
         return $this->render('cart/index', [
             'cartItems' => $cartItems,
+            'itemsBySeller' => $itemsBySeller,
+            'sellerProfiles' => $sellerProfiles,
+            'belowMinimumSellers' => $belowMinimumSellers,
             'totalAmount' => $totalAmount
         ]);
     }
@@ -126,6 +173,9 @@ class CartController extends Controller {
         $response = Application::$app->response;
         $session = Application::$app->session;
         
+        // Добавляем логирование для отладки
+        error_log('Remove from cart request: ' . json_encode($request->getJson()));
+        
         if (!$request->isAjax()) {
             $response->setStatusCode(400);
             echo json_encode(['success' => false, 'message' => 'Invalid request']);
@@ -133,6 +183,7 @@ class CartController extends Controller {
         }
         
         $data = $request->getJson();
+        error_log('Request data: ' . json_encode($data));
         
         if (!isset($data['product_id'])) {
             $response->setStatusCode(400);
@@ -275,5 +326,56 @@ class CartController extends Controller {
         $statement->execute();
         
         return $statement->fetch(PDO::FETCH_ASSOC);
+    }
+    
+    /**
+     * Get seller profiles by IDs
+     * @param array $sellerIds Seller IDs
+     * @return array Seller profiles indexed by ID
+     */
+    private function getSellerProfiles(array $sellerIds): array {
+        if (empty($sellerIds)) {
+            return [];
+        }
+        
+        // Filter out any null or invalid values and ensure unique IDs
+        $sellerIds = array_filter(array_unique($sellerIds), function($id) {
+            return is_numeric($id) && $id > 0;
+        });
+        
+        if (empty($sellerIds)) {
+            return [];
+        }
+        
+        // Use named parameters instead of positional parameters
+        $placeholders = [];
+        $params = [];
+        
+        foreach ($sellerIds as $i => $id) {
+            $paramName = ":seller_id_{$i}";
+            $placeholders[] = $paramName;
+            $params[$paramName] = $id;
+        }
+        
+        $placeholdersStr = implode(',', $placeholders);
+        $sql = "SELECT * FROM seller_profiles WHERE id IN ($placeholdersStr)";
+        
+        $statement = Application::$app->db->prepare($sql);
+        
+        // Bind all parameters
+        foreach ($params as $param => $value) {
+            $statement->bindValue($param, $value, PDO::PARAM_INT);
+        }
+        
+        $statement->execute();
+        $profiles = $statement->fetchAll(PDO::FETCH_ASSOC);
+        
+        // Index by ID
+        $result = [];
+        foreach ($profiles as $profile) {
+            $result[$profile['id']] = $profile;
+        }
+        
+        return $result;
     }
 }
