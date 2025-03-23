@@ -90,6 +90,12 @@ use App\Core\Application;
                             </div>
                             <i class="bi bi-chevron-right"></i>
                         </a>
+                        <a href="/admin/delivery-zones" class="list-group-item list-group-item-action d-flex justify-content-between align-items-center">
+                            <div>
+                                <i class="bi bi-geo-alt"></i> Manage Delivery Zones
+                            </div>
+                            <i class="bi bi-chevron-right"></i>
+                        </a>
                         <a href="/admin/products" class="list-group-item list-group-item-action d-flex justify-content-between align-items-center">
                             <div>
                                 <i class="bi bi-box"></i> Manage Products

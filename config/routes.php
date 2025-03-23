@@ -28,6 +28,15 @@ $router->post('/admin/users/delete/{id}', [AdminController::class, 'deleteUser']
 $router->get('/admin/users/manage-seller-profile/{id}', [AdminController::class, 'manageSellerProfile']);
 $router->get('/admin/clear-cache', [AdminController::class, 'clearCache']);
 
+// Admin delivery zones management routes
+$router->get('/admin/delivery-zones', [AdminController::class, 'deliveryZones']);
+$router->post('/admin/cities/add', [AdminController::class, 'addCity']);
+$router->post('/admin/cities/edit', [AdminController::class, 'editCity']);
+$router->post('/admin/cities/delete', [AdminController::class, 'deleteCity']);
+$router->post('/admin/districts/add', [AdminController::class, 'addDistrict']);
+$router->post('/admin/districts/edit', [AdminController::class, 'editDistrict']);
+$router->post('/admin/districts/delete', [AdminController::class, 'deleteDistrict']);
+
 // Catalog routes
 $router->get('/catalog', [CatalogController::class, 'index']);
 $router->post('/catalog/getProducts', [CatalogController::class, 'getProducts']);

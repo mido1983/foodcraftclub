@@ -552,6 +552,406 @@ class AdminController extends Controller {
     }
     
     /**
+     * Display cities and districts management page
+     * @return string Rendered view
+     */
+    public function deliveryZones(): string {
+        $this->view->title = 'Manage Delivery Zones';
+        
+        try {
+            // Get all districts
+            $districtsStmt = Application::$app->db->prepare("SELECT id, district_name FROM districts ORDER BY district_name ASC");
+            $districtsStmt->execute();
+            $districts = $districtsStmt->fetchAll(PDO::FETCH_ASSOC);
+            
+            // Get all cities with district names
+            $citiesStmt = Application::$app->db->prepare("
+                SELECT c.id, c.city_name, c.district_id, d.district_name 
+                FROM cities c
+                INNER JOIN districts d ON c.district_id = d.id
+                ORDER BY d.district_name ASC, c.city_name ASC
+            ");
+            $citiesStmt->execute();
+            $cities = $citiesStmt->fetchAll(PDO::FETCH_ASSOC);
+            
+            return $this->render('admin/delivery-zones', [
+                'cities' => $cities,
+                'districts' => $districts
+            ]);
+        } catch (Exception $e) {
+            Application::$app->logger->error(
+                'Error loading delivery zones data', 
+                ['error' => $e->getMessage()],
+                'admin.log'
+            );
+            
+            Application::$app->session->setFlash('error', 'Error loading delivery zones data: ' . $e->getMessage());
+            return $this->render('admin/delivery-zones', [
+                'cities' => [],
+                'districts' => []
+            ]);
+        }
+    }
+    
+    /**
+     * Add new city
+     * @return string Redirect response
+     */
+    public function addCity(): string {
+        if (Application::$app->request->isPost()) {
+            $cityName = Application::$app->request->getBody()['city_name'] ?? '';
+            $districtId = (int)Application::$app->request->getBody()['district_id'] ?? 0;
+            
+            if (empty($cityName)) {
+                Application::$app->session->setFlash('error', 'City name is required');
+                return Application::$app->response->redirect('/admin/delivery-zones');
+            }
+            
+            if ($districtId <= 0) {
+                Application::$app->session->setFlash('error', 'Valid district is required');
+                return Application::$app->response->redirect('/admin/delivery-zones');
+            }
+            
+            try {
+                $db = Application::$app->db;
+                
+                // Check if city already exists
+                $checkStmt = $db->prepare("SELECT id FROM cities WHERE city_name = :city_name");
+                $checkStmt->execute(['city_name' => $cityName]);
+                
+                if ($checkStmt->rowCount() > 0) {
+                    Application::$app->session->setFlash('error', 'City with this name already exists');
+                    return Application::$app->response->redirect('/admin/delivery-zones');
+                }
+                
+                // Add new city
+                $insertStmt = $db->prepare("INSERT INTO cities (city_name, district_id) VALUES (:city_name, :district_id)");
+                $result = $insertStmt->execute([
+                    'city_name' => $cityName,
+                    'district_id' => $districtId
+                ]);
+                
+                if ($result) {
+                    Application::$app->session->setFlash('success', 'City added successfully');
+                } else {
+                    Application::$app->session->setFlash('error', 'Failed to add city');
+                }
+            } catch (Exception $e) {
+                Application::$app->logger->error(
+                    'Error adding city', 
+                    ['city_name' => $cityName, 'district_id' => $districtId, 'error' => $e->getMessage()],
+                    'admin.log'
+                );
+                
+                Application::$app->session->setFlash('error', 'Error adding city: ' . $e->getMessage());
+            }
+        }
+        
+        return Application::$app->response->redirect('/admin/delivery-zones');
+    }
+    
+    /**
+     * Edit city
+     * @return string Redirect response
+     */
+    public function editCity(): string {
+        if (Application::$app->request->isPost()) {
+            $cityId = (int)Application::$app->request->getBody()['city_id'] ?? 0;
+            $cityName = Application::$app->request->getBody()['city_name'] ?? '';
+            $districtId = (int)Application::$app->request->getBody()['district_id'] ?? 0;
+            
+            if (empty($cityId)) {
+                Application::$app->session->setFlash('error', 'City ID is required');
+                return Application::$app->response->redirect('/admin/delivery-zones');
+            }
+            
+            if (empty($cityName)) {
+                Application::$app->session->setFlash('error', 'City name is required');
+                return Application::$app->response->redirect('/admin/delivery-zones');
+            }
+            
+            if ($districtId <= 0) {
+                Application::$app->session->setFlash('error', 'Valid district is required');
+                return Application::$app->response->redirect('/admin/delivery-zones');
+            }
+            
+            try {
+                $db = Application::$app->db;
+                
+                // Check if city exists
+                $checkStmt = $db->prepare("SELECT id FROM cities WHERE id = :id");
+                $checkStmt->execute(['id' => $cityId]);
+                
+                if ($checkStmt->rowCount() === 0) {
+                    Application::$app->session->setFlash('error', 'City not found');
+                    return Application::$app->response->redirect('/admin/delivery-zones');
+                }
+                
+                // Check if new name already exists for another city
+                $duplicateStmt = $db->prepare("SELECT id FROM cities WHERE city_name = :city_name AND id != :id");
+                $duplicateStmt->execute(['city_name' => $cityName, 'id' => $cityId]);
+                
+                if ($duplicateStmt->rowCount() > 0) {
+                    Application::$app->session->setFlash('error', 'Another city with this name already exists');
+                    return Application::$app->response->redirect('/admin/delivery-zones');
+                }
+                
+                // Update city
+                $updateStmt = $db->prepare("UPDATE cities SET city_name = :city_name, district_id = :district_id WHERE id = :id");
+                $result = $updateStmt->execute([
+                    'city_name' => $cityName, 
+                    'district_id' => $districtId,
+                    'id' => $cityId
+                ]);
+                
+                if ($result) {
+                    Application::$app->session->setFlash('success', 'City updated successfully');
+                } else {
+                    Application::$app->session->setFlash('error', 'Failed to update city');
+                }
+            } catch (Exception $e) {
+                Application::$app->logger->error(
+                    'Error updating city', 
+                    ['city_id' => $cityId, 'city_name' => $cityName, 'district_id' => $districtId, 'error' => $e->getMessage()],
+                    'admin.log'
+                );
+                
+                Application::$app->session->setFlash('error', 'Error updating city: ' . $e->getMessage());
+            }
+        }
+        
+        return Application::$app->response->redirect('/admin/delivery-zones');
+    }
+    
+    /**
+     * Delete city
+     * @return string Redirect response
+     */
+    public function deleteCity(): string {
+        if (Application::$app->request->isPost()) {
+            $cityId = (int)Application::$app->request->getBody()['city_id'] ?? 0;
+            
+            if (empty($cityId)) {
+                Application::$app->session->setFlash('error', 'City ID is required');
+                return Application::$app->response->redirect('/admin/delivery-zones');
+            }
+            
+            try {
+                $db = Application::$app->db;
+                
+                // Check if city exists
+                $checkStmt = $db->prepare("SELECT id FROM cities WHERE id = :id");
+                $checkStmt->execute(['id' => $cityId]);
+                
+                if ($checkStmt->rowCount() === 0) {
+                    Application::$app->session->setFlash('error', 'City not found');
+                    return Application::$app->response->redirect('/admin/delivery-zones');
+                }
+                
+                // Delete city
+                $deleteStmt = $db->prepare("DELETE FROM cities WHERE id = :id");
+                $result = $deleteStmt->execute(['id' => $cityId]);
+                
+                if ($result) {
+                    Application::$app->session->setFlash('success', 'City deleted successfully');
+                } else {
+                    Application::$app->session->setFlash('error', 'Failed to delete city');
+                }
+            } catch (Exception $e) {
+                Application::$app->logger->error(
+                    'Error deleting city', 
+                    ['city_id' => $cityId, 'error' => $e->getMessage()],
+                    'admin.log'
+                );
+                
+                Application::$app->session->setFlash('error', 'Error deleting city: ' . $e->getMessage());
+            }
+        }
+        
+        return Application::$app->response->redirect('/admin/delivery-zones');
+    }
+    
+    /**
+     * Add new district
+     * @return string Redirect response
+     */
+    public function addDistrict(): string {
+        if (Application::$app->request->isPost()) {
+            $districtName = Application::$app->request->getBody()['district_name'] ?? '';
+            
+            if (empty($districtName)) {
+                Application::$app->session->setFlash('error', 'District name is required');
+                return Application::$app->response->redirect('/admin/delivery-zones');
+            }
+            
+            try {
+                $db = Application::$app->db;
+                
+                // Check if district already exists
+                $checkDistrictStmt = $db->prepare("SELECT id FROM districts WHERE district_name = :district_name");
+                $checkDistrictStmt->execute(['district_name' => $districtName]);
+                
+                if ($checkDistrictStmt->rowCount() > 0) {
+                    Application::$app->session->setFlash('error', 'District already exists');
+                    return Application::$app->response->redirect('/admin/delivery-zones');
+                }
+                
+                // Add new district
+                $insertStmt = $db->prepare("INSERT INTO districts (district_name) VALUES (:district_name)");
+                $result = $insertStmt->execute(['district_name' => $districtName]);
+                
+                if ($result) {
+                    Application::$app->session->setFlash('success', 'District added successfully');
+                } else {
+                    Application::$app->session->setFlash('error', 'Failed to add district');
+                }
+            } catch (Exception $e) {
+                Application::$app->logger->error(
+                    'Error adding district', 
+                    ['district_name' => $districtName, 'error' => $e->getMessage()],
+                    'admin.log'
+                );
+                
+                Application::$app->session->setFlash('error', 'Error adding district: ' . $e->getMessage());
+            }
+        }
+        
+        return Application::$app->response->redirect('/admin/delivery-zones');
+    }
+    
+    /**
+     * Edit district
+     * @return string Redirect response
+     */
+    public function editDistrict(): string {
+        if (Application::$app->request->isPost()) {
+            $districtId = (int)Application::$app->request->getBody()['district_id'] ?? 0;
+            $districtName = Application::$app->request->getBody()['district_name'] ?? '';
+            
+            if (empty($districtId)) {
+                Application::$app->session->setFlash('error', 'District ID is required');
+                return Application::$app->response->redirect('/admin/delivery-zones');
+            }
+            
+            if (empty($districtName)) {
+                Application::$app->session->setFlash('error', 'District name is required');
+                return Application::$app->response->redirect('/admin/delivery-zones');
+            }
+            
+            try {
+                $db = Application::$app->db;
+                
+                // Check if district exists
+                $checkStmt = $db->prepare("SELECT id FROM districts WHERE id = :id");
+                $checkStmt->execute(['id' => $districtId]);
+                
+                if ($checkStmt->rowCount() === 0) {
+                    Application::$app->session->setFlash('error', 'District not found');
+                    return Application::$app->response->redirect('/admin/delivery-zones');
+                }
+                
+                // Check if new name already exists for another district
+                $duplicateStmt = $db->prepare("
+                    SELECT id FROM districts 
+                    WHERE district_name = :district_name AND id != :id
+                ");
+                $duplicateStmt->execute([
+                    'district_name' => $districtName, 
+                    'id' => $districtId
+                ]);
+                
+                if ($duplicateStmt->rowCount() > 0) {
+                    Application::$app->session->setFlash('error', 'District name already exists');
+                    return Application::$app->response->redirect('/admin/delivery-zones');
+                }
+                
+                // Update district
+                $updateStmt = $db->prepare("UPDATE districts SET district_name = :district_name WHERE id = :id");
+                $result = $updateStmt->execute([
+                    'district_name' => $districtName, 
+                    'id' => $districtId
+                ]);
+                
+                if ($result) {
+                    Application::$app->session->setFlash('success', 'District updated successfully');
+                } else {
+                    Application::$app->session->setFlash('error', 'Failed to update district');
+                }
+            } catch (Exception $e) {
+                Application::$app->logger->error(
+                    'Error updating district', 
+                    ['district_id' => $districtId, 'district_name' => $districtName, 'error' => $e->getMessage()],
+                    'admin.log'
+                );
+                
+                Application::$app->session->setFlash('error', 'Error updating district: ' . $e->getMessage());
+            }
+        }
+        
+        return Application::$app->response->redirect('/admin/delivery-zones');
+    }
+    
+    /**
+     * Delete district
+     * @return string Redirect response
+     */
+    public function deleteDistrict(): string {
+        if (Application::$app->request->isPost()) {
+            $districtId = (int)Application::$app->request->getBody()['district_id'] ?? 0;
+            
+            if (empty($districtId)) {
+                Application::$app->session->setFlash('error', 'District ID is required');
+                return Application::$app->response->redirect('/admin/delivery-zones');
+            }
+            
+            try {
+                $db = Application::$app->db;
+                
+                // Check if district exists
+                $checkStmt = $db->prepare("SELECT id FROM districts WHERE id = :id");
+                $checkStmt->execute(['id' => $districtId]);
+                
+                if ($checkStmt->rowCount() === 0) {
+                    Application::$app->session->setFlash('error', 'District not found');
+                    return Application::$app->response->redirect('/admin/delivery-zones');
+                }
+                
+                // Check if district is being used by cities
+                $checkUsageStmt = $db->prepare("SELECT COUNT(*) as count FROM cities WHERE district_id = :district_id");
+                $checkUsageStmt->execute(['district_id' => $districtId]);
+                $usageCount = (int)$checkUsageStmt->fetch(PDO::FETCH_ASSOC)['count'];
+                
+                if ($usageCount > 0) {
+                    Application::$app->session->setFlash('error', "Cannot delete district: it is used by {$usageCount} cities");
+                    return Application::$app->response->redirect('/admin/delivery-zones');
+                }
+                
+                // Delete district
+                $deleteStmt = $db->prepare("DELETE FROM districts WHERE id = :id");
+                $result = $deleteStmt->execute(['id' => $districtId]);
+                
+                if ($result) {
+                    Application::$app->session->setFlash('success', 'District deleted successfully');
+                } else {
+                    Application::$app->session->setFlash('error', 'Failed to delete district');
+                }
+            } catch (Exception $e) {
+                Application::$app->logger->error(
+                    'Error deleting district', 
+                    ['district_id' => $districtId, 'error' => $e->getMessage()],
+                    'admin.log'
+                );
+                
+                Application::$app->session->setFlash('error', 'Error: ' . $e->getMessage());
+            }
+            
+            return Application::$app->response->redirect('/admin/delivery-zones');
+        }
+        
+        return Application::$app->response->redirect('/admin/delivery-zones');
+    }
+    
+    /**
      * Get count of all users
      * @return int User count
      */
