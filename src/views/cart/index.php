@@ -62,6 +62,9 @@
                                                         <?php endif; ?>
                                                         <div>
                                                             <h6 class="mb-1"><?= htmlspecialchars($item['product_name']) ?></h6>
+                                                            <?php if (isset($item['available_quantity']) && $item['available_quantity'] < 10): ?>
+                                                                <p class="text-danger mb-0"><small><i class="bi bi-exclamation-triangle"></i> Осталось всего <?= $item['available_quantity'] ?>!</small></p>
+                                                            <?php endif; ?>
                                                         </div>
                                                     </div>
                                                 </td>

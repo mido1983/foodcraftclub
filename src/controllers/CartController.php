@@ -120,14 +120,24 @@ class CartController extends Controller {
         
         if (!$product) {
             $response->setStatusCode(404);
-            echo json_encode(['success' => false, 'message' => 'Product not found']);
+            echo json_encode(['success' => false, 'message' => 'Товар не найден']);
             return;
         }
         
         // Check if product is available
         if ($product['is_active'] != 1 && $product['available_for_preorder'] != 1) {
             $response->setStatusCode(400);
-            echo json_encode(['success' => false, 'message' => 'Product is not available']);
+            echo json_encode(['success' => false, 'message' => 'Товар не доступен']);
+            return;
+        }
+        
+        // Проверяем доступное количество товара
+        if ($quantity > $product['quantity']) {
+            $response->setStatusCode(400);
+            echo json_encode([
+                'success' => false, 
+                'message' => "Недостаточное количество товара. Доступно: {$product['quantity']}"
+            ]);
             return;
         }
         
@@ -249,6 +259,23 @@ class CartController extends Controller {
             return;
         }
         
+        // Проверяем доступное количество товара
+        $product = $this->getProductById($productId);
+        if (!$product) {
+            $response->setStatusCode(404);
+            echo json_encode(['success' => false, 'message' => 'Товар не найден']);
+            return;
+        }
+        
+        if ($quantity > $product['quantity']) {
+            $response->setStatusCode(400);
+            echo json_encode([
+                'success' => false, 
+                'message' => "Недостаточное количество товара. Доступно: {$product['quantity']}"
+            ]);
+            return;
+        }
+        
         // Get current cart
         $cart = $session->get('cart') ?? [];
         
@@ -286,12 +313,59 @@ class CartController extends Controller {
     }
     
     /**
-     * Get cart items from session
+     * Get cart items with product details
      * @return array Cart items
      */
     private function getCartItems(): array {
         $session = Application::$app->session;
-        return $session->get('cart') ?? [];
+        $cart = $session->get('cart') ?? [];
+        
+        if (empty($cart)) {
+            return [];
+        }
+        
+        // Get product details for cart items
+        $productIds = array_keys($cart);
+        $placeholders = implode(',', array_fill(0, count($productIds), '?'));
+        
+        $sql = "SELECT p.*, sp.name as seller_name, 
+                    (SELECT image_url FROM product_images WHERE product_id = p.id AND is_main = 1 LIMIT 1) as main_image,
+                    p.quantity as available_quantity
+               FROM products p
+               LEFT JOIN seller_profiles sp ON p.seller_profile_id = sp.id
+               WHERE p.id IN ($placeholders)";
+        
+        $statement = Application::$app->db->prepare($sql);
+        
+        // Bind product IDs
+        foreach ($productIds as $index => $productId) {
+            $statement->bindValue($index + 1, $productId, PDO::PARAM_INT);
+        }
+        
+        $statement->execute();
+        $products = $statement->fetchAll(PDO::FETCH_ASSOC);
+        
+        // Index products by ID
+        $productsById = [];
+        foreach ($products as $product) {
+            $productsById[$product['id']] = $product;
+        }
+        
+        // Combine cart items with product details
+        $cartItems = [];
+        foreach ($cart as $productId => $item) {
+            if (isset($productsById[$productId])) {
+                $cartItems[$productId] = array_merge($item, [
+                    'available_quantity' => $productsById[$productId]['available_quantity']
+                ]);
+            } else {
+                // Product no longer exists, remove from cart
+                unset($cart[$productId]);
+                $session->set('cart', $cart);
+            }
+        }
+        
+        return $cartItems;
     }
     
     /**

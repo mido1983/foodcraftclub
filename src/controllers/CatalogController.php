@@ -109,7 +109,8 @@ class CatalogController extends Controller {
         $sql = "SELECT p.*, c.name as category_name, sp.name as seller_name, 
                     (SELECT image_url FROM product_images WHERE product_id = p.id AND is_main = 1 LIMIT 1) as main_image,
                     0 as avg_rating,
-                    0 as rating_count
+                    0 as rating_count,
+                    p.quantity as quantity
                FROM products p
                LEFT JOIN categories c ON p.category_id = c.id
                LEFT JOIN seller_profiles sp ON p.seller_profile_id = sp.id

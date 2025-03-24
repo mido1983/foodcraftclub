@@ -262,6 +262,27 @@ class CheckoutController extends Controller {
                         $itemStmt->bindValue(':quantity', $item['quantity'], PDO::PARAM_INT);
                         $itemStmt->bindValue(':price_at_moment', $item['price'], PDO::PARAM_STR);
                         $itemStmt->execute();
+                        
+                        // Уменьшаем количество товара в базе данных
+                        $updateQuantitySql = "UPDATE products SET quantity = quantity - :ordered_quantity 
+                                             WHERE id = :product_id AND quantity >= :ordered_quantity";
+                        $updateQuantityStmt = $db->prepare($updateQuantitySql);
+                        $updateQuantityStmt->bindValue(':product_id', $item['product_id'], PDO::PARAM_INT);
+                        $updateQuantityStmt->bindValue(':ordered_quantity', $item['quantity'], PDO::PARAM_INT);
+                        $updateQuantityStmt->execute();
+                        
+                        // Проверяем, было ли обновлено количество товара
+                        if ($updateQuantityStmt->rowCount() === 0) {
+                            // Получаем текущее количество товара
+                            $checkQuantitySql = "SELECT quantity FROM products WHERE id = :product_id";
+                            $checkQuantityStmt = $db->prepare($checkQuantitySql);
+                            $checkQuantityStmt->bindValue(':product_id', $item['product_id'], PDO::PARAM_INT);
+                            $checkQuantityStmt->execute();
+                            $availableQuantity = $checkQuantityStmt->fetchColumn();
+                            
+                            // Откатываем транзакцию, если товара недостаточно
+                            throw new \Exception("Недостаточное количество товара '{$item['product_name']}'. Доступно: {$availableQuantity}, запрошено: {$item['quantity']}");
+                        }
                     }
                 }
                 

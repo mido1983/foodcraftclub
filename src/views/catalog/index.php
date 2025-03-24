@@ -155,6 +155,10 @@
                         <h5 class="product-price mb-0"></h5>
                         <button class="btn btn-sm btn-outline-primary add-to-cart-btn">В корзину</button>
                     </div>
+                    <div class="product-quantity-container mt-2">
+                        <span class="product-quantity text-muted"></span>
+                        <span class="product-quantity-warning text-danger d-none">Поторопись, осталось всего <span class="product-quantity-value"></span>!</span>
+                    </div>
                 </div>
             </div>
         </div>
@@ -202,6 +206,12 @@
                             <div>
                                 <button id="modal-add-to-cart" class="btn btn-primary me-2">Добавить в корзину</button>
                                 <button id="modal-save-for-later" class="btn btn-outline-secondary">Сохранить на потом</button>
+                            </div>
+                        </div>
+                        <div class="mt-3">
+                            <span id="modal-product-quantity" class="text-muted"></span>
+                            <div id="modal-quantity-warning" class="text-danger mt-1 d-none">
+                                <i class="bi bi-exclamation-triangle"></i> Поторопись, осталось всего <span id="modal-quantity-value"></span>!
                             </div>
                         </div>
                     </div>
@@ -488,6 +498,22 @@
                     preorderBadge.classList.add('d-none');
                 }
                 
+                // Отображаем количество товара
+                const quantityContainer = card.querySelector('.product-quantity-container');
+                const quantityText = card.querySelector('.product-quantity');
+                const quantityWarning = card.querySelector('.product-quantity-warning');
+                const quantityValue = card.querySelector('.product-quantity-value');
+                
+                if (product.quantity < 10) {
+                    quantityText.classList.add('d-none');
+                    quantityWarning.classList.remove('d-none');
+                    quantityValue.textContent = product.quantity;
+                } else {
+                    quantityText.textContent = `В наличии: ${product.quantity}`;
+                    quantityText.classList.remove('d-none');
+                    quantityWarning.classList.add('d-none');
+                }
+                
                 // Добавляем карточку в контейнер
                 container.appendChild(card);
             });
@@ -528,6 +554,21 @@
                 preorderBadge.classList.remove('d-none');
             } else {
                 preorderBadge.classList.add('d-none');
+            }
+            
+            // Отображаем количество товара
+            const quantityText = document.getElementById('modal-product-quantity');
+            const quantityWarning = document.getElementById('modal-quantity-warning');
+            const quantityValue = document.getElementById('modal-quantity-value');
+            
+            if (product.quantity < 10) {
+                quantityText.classList.add('d-none');
+                quantityWarning.classList.remove('d-none');
+                quantityValue.textContent = product.quantity;
+            } else {
+                quantityText.textContent = `В наличии: ${product.quantity}`;
+                quantityText.classList.remove('d-none');
+                quantityWarning.classList.add('d-none');
             }
             
             // Открываем модальное окно
