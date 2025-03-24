@@ -258,8 +258,9 @@ class SellerDashboardController extends DashboardController {
             if (!$sellerProfile) {
                 return [
                     'total_products' => 0,
+                    'active_products' => 0,
                     'total_orders' => 0,
-                    'total_sales' => 0,
+                    'total_revenue' => 0,
                     'avg_rating' => 0
                 ];
             }
@@ -267,6 +268,11 @@ class SellerDashboardController extends DashboardController {
             $productsStmt = Application::$app->db->prepare("SELECT COUNT(*) as total FROM products WHERE seller_profile_id = :seller_profile_id");
             $productsStmt->execute(['seller_profile_id' => $sellerProfile['id']]);
             $totalProducts = $productsStmt->fetch(PDO::FETCH_ASSOC)['total'];
+            
+            // Get count of active products (is_active = 1)
+            $activeProductsStmt = Application::$app->db->prepare("SELECT COUNT(*) as total FROM products WHERE seller_profile_id = :seller_profile_id AND is_active = 1");
+            $activeProductsStmt->execute(['seller_profile_id' => $sellerProfile['id']]);
+            $activeProducts = $activeProductsStmt->fetch(PDO::FETCH_ASSOC)['total'];
             
             $ordersStmt = Application::$app->db->prepare("
                 SELECT COUNT(*) as order_count, COALESCE(SUM(total_amount), 0) as total_sales
@@ -297,8 +303,9 @@ class SellerDashboardController extends DashboardController {
             
             return [
                 'total_products' => (int)$totalProducts,
+                'active_products' => (int)$activeProducts,
                 'total_orders' => (int)($orderData['order_count'] ?? 0),
-                'total_sales' => (float)($orderData['total_sales'] ?? 0),
+                'total_revenue' => (float)($orderData['total_sales'] ?? 0),
                 'avg_rating' => round((float)$avgRating, 1)
             ];
         } catch (Exception $e) {
@@ -310,8 +317,9 @@ class SellerDashboardController extends DashboardController {
             
             return [
                 'total_products' => 0,
+                'active_products' => 0,
                 'total_orders' => 0,
-                'total_sales' => 0,
+                'total_revenue' => 0,
                 'avg_rating' => 0
             ];
         }
@@ -419,7 +427,11 @@ class SellerDashboardController extends DashboardController {
             
             $sellerProfile = $this->getSellerProfile($user->id);
             if (!$sellerProfile) {
-                Application::$app->session->setFlash('error', 'u0423 u0432u0430u0441 u043du0435u0442 u043fu0440u043eu0444u0438u043b044a u043fu0440u043eu0441u043bu0435 u043fu0440u043eu0434u0430u0432u0446u0430');
+                Application::$app->logger->warning(
+                    'Attempt to access new product page without seller profile', 
+                    ['user_id' => $user->id]
+                );
+                Application::$app->session->setFlash('error', 'u0423 u0432u0430u0441 u043du0435u0442 u043fu0440u043eu0444u0438u043b044a u043fu0440u043eu0441u043bu0435 u043fu0440u043eu0441u043bu0435 u043fu0440u043eu0434u0430u0432u0446u0430');
                 return Application::$app->response->redirect('/seller/profile');
             }
             
@@ -427,7 +439,7 @@ class SellerDashboardController extends DashboardController {
             
             // u041fu0440u0435u043eu0431u0440u0430u0437u0443u0435u043c u043du0430 u043du0430u043lu0438u0447u0438u0435 u043eu0431u044fu0437u0430u0442u0435u043lu044cu043du044bu0443 u043fu0440u043eu0444u0438u043lu044h
             if (empty($body['id']) || empty($body['product_name']) || empty($body['price'])) {
-                Application::$app->session->setFlash('error', 'u041du0435u043e0431u0445043e04340438u043c043e u04370430043f043e043b043d0438u0442u044c u0432 u0430u043au0442u0438u0432u043d043eu0439 u0444u043eu0440u043c0435');
+                Application::$app->session->setFlash('error', 'u041du0435u043e0431u0445043e04340438u043cu043e u04370430043f043e043b043du0438u0442u044c u0432 u0430u043au0442u0438u0432u043du043eu0439 u0444u043eu0440u043c0435');
                 return Application::$app->response->redirect('/seller/products');
             }
             
@@ -447,7 +459,7 @@ class SellerDashboardController extends DashboardController {
             
             $product = $checkStatement->fetch(PDO::FETCH_ASSOC);
             if (!$product) {
-                Application::$app->session->setFlash('error', 'u041f0440u043e0434u0443u043a0442 u043d0435 u043d0430u043904340435u043d u0438u043b0438 u0443 u04320430u0441 u043d0435u0442 u043f04400430u0435u0432 u043d0430 u0435u0433u043e u0440043504340430u043a04420438u0440u043eu0440u043eu044fn0438u0435');
+                Application::$app->session->setFlash('error', 'u041f0440u043e0434u0443u043a0442 u043du0435 u043du0430u043904340435u043du044a u0438u043b0438 u0443 u04320430u0441 u043du0435u0442 u043f04400430u0435u0432 u043d0430 u0435u0433u043e u0440043504340430u043a04420438u0440u043eu0440u043eu044fn0438u0435');
                 return Application::$app->response->redirect('/seller/products');
             }
             
@@ -503,7 +515,7 @@ class SellerDashboardController extends DashboardController {
                                 'image_url' => '/uploads/products/' . $fileName
                             ]);
                         } else {
-                            // u0421u043eu0437u0434u0430u0435u043c u043du043e0432u043eu0435 u0438u0437u043e0431u0440u0430u0436u0435u043d0438u0435
+                            // u0421u043eu0437u0434u0430u0435u043c u043du043e0432u043eu0435 u0438u0437u043e0431u0440u0430u0437u0435u043du0438u0435
                             $insertImageStatement = $db->prepare("
                                 INSERT INTO product_images (product_id, image_url, is_main)
                                 VALUES (:product_id, :image_url, :is_main)
@@ -515,15 +527,17 @@ class SellerDashboardController extends DashboardController {
                             ]);
                         }
                     } else {
-                        throw new \Exception('u041e0430440438u0438u0431043a0430 u043f04400438 u0437043004330430270435u043d0438u0438 u04380437043e0431u0440043004360435u043d0438u044f');
+                        throw new \Exception('u041e0430440438u0438u0431043a0430 u043f04400438 u0437043004330430270435u043du0438u0438 u04380437043e0431u0440043004360435u043d0438u044f');
                     }
                 } else {
-                    throw new \Exception('u041du04350434043e043f043004330430u04410438u043c0438 u04420438u0430u043f u0438u043b0438 u044004300437u043c0435u0440 u04380437043e0431u0440043004360435u043d0438u044f');
+                    throw new \Exception('u041du04350434043e043f043004330430u04410438u043cu0438 u04420438u0430u043f u0438u043b0438 u044004300437u043cu0435u0440 u04380437043e0431u0440043004360435u043d0438u044f');
                 }
             }
             
             // u041eu0431u0440u0430u0431u043eu0442u043au0430 u0441u043fu043e0440u0430 u0437u0430u0433u0440u0443u0437u043a0438 u0430u0432u0430u0442u0430u0440u0430
             if (isset($data['payment_methods']) && is_array($data['payment_methods'])) {
+                // u041fu0440u0435u0437u0430u0433u0440u0443u0437u0430u0435u043c u0432 u043cu0430u0441u0441u0438u0432 ID
+                
                 // u041fu0440u0435u0437u0430u0433u0440u0443u0437u0430u0435u043c u0432 u043cu0430u0441u0441u0438u0432 ID
                 Application::$app->logger->info(
                     'Attempting to add payment methods', 
@@ -1024,7 +1038,7 @@ class SellerDashboardController extends DashboardController {
             return Application::$app->response->redirect('/login');
         }
         
-        // u041fu0440u0435u043eu0431u0440u0430u0437u0443u0435u043c u043fu0440u043eu0444u0438u043bu044c u043fu0440u043eu0441u043bu0435 u043fu0440u043eu0434u0430u0432u0446u0430
+        // u041fu0440u0435u043eu0431u0440u0430u0437u0443u0435u043c u043fu0440u043eu0444u0438u043bu044c u043fu0440u043eu0441u043bu0435 u043fu0440u043eu0441u043bu0435 u043fu0440u043eu0434u0430u0432u0446u0430
         $sellerProfile = $this->getSellerProfile($user->id);
         
         if (!$sellerProfile) {
@@ -1036,7 +1050,7 @@ class SellerDashboardController extends DashboardController {
             return Application::$app->response->redirect('/seller');
         }
         
-        // u041fu0440u0435u043eu0431u0440u0430u0437u0443u0435u043c u0434u043e0441u0442u0443u043f u0441u043fu043e0440u0430 u043e043f043b0430u0442u044b
+        // u041fu0440u0435u0437u0430u0433u0440u0443u0437u0430u0435u043c u0434u043e0441u0442u0443u043f u0441u043fu043e0440u0430 u043e043f043b0430u0442u044b
         $paymentMethods = [];
         $sellerPaymentOptions = [];
         
@@ -1048,7 +1062,7 @@ class SellerDashboardController extends DashboardController {
             $methodsStmt->execute();
             $paymentMethods = $methodsStmt->fetchAll(PDO::FETCH_ASSOC) ?: [];
             
-            // u0417u0430u043fu0440u043eu0441 u043du0430 u043fu0435u0440u0435u0447u0435u043du044c u0432 u0432u0438u0431u0440 u0438 u04310440u0430u043d043du044bu0443 u0441u043fu043e0441u043e0431u043e0432 u043e043f043b0430u0442u044b u043f0440u043e0434u0430u0432u0446u0430
+            // u0417u0430u043fu0440u043eu0441 u043du0430 u043fu0435u0440u0435u0447u0435u043du044c u0432 u0432u0438u0431u0440 u0438 u04310440u0430u043du043du044bu0443 u0441u043fu043e0441u043e0431u043e0432 u043e043f043b0430u0442u044b u043f0440u043e0434u0430u0432u0446u0430
             $optionsStmt = $db->prepare("SELECT payment_method_id FROM seller_payment_options WHERE seller_profile_id = :seller_profile_id");
             $optionsStmt->execute(['seller_profile_id' => $sellerProfile['id']]);
             $options = $optionsStmt->fetchAll(PDO::FETCH_ASSOC) ?: [];
@@ -1073,7 +1087,7 @@ class SellerDashboardController extends DashboardController {
             // u0412u0430u043bu0438u0434u0430u0446u0438u044f u0434u0430u043du043du044bu0443
             $errors = [];
             
-            // u041fu0440u0435u043eu0431u0440u0430u0437u0443u0435u043c u043du0430 u043du0430u043lu0438u0447u0438u0435 u043eu0431u044fu0437u0430u0442u0435u043lu044cu043du044bu0443 u043fu0440u043eu0444u0438u043lu044h
+            // u041fu0440u0435u0437u0430u0433u0440u0443u0437u0430u0435u043c u043du0430 u043du0430u043lu0438u0447u0438u0435 u043eu0431u044fu0437u0430u0442u0435u043lu044cu043du044bu0443 u043fu0440u043eu0444u0438u043lu044h
             if (empty($data['name'])) {
                 $errors[] = 'Shop name is required';
             }
@@ -1690,15 +1704,18 @@ class SellerDashboardController extends DashboardController {
      */
     protected function getOrderById(int $orderId, int $sellerProfileId): ?array {
         try {
+            // First, get the basic order information
             $statement = Application::$app->db->prepare("
                 SELECT o.*, u.email as customer_email, u.full_name as buyer_name,
                        pm.method_name as payment_method_name,
-                       c.city_name, d.district_name
+                       c.city_name, d.district_name,
+                       om.phone
                 FROM orders o
                 JOIN users u ON o.buyer_id = u.id
                 LEFT JOIN payment_methods pm ON o.payment_method_id = pm.id
                 LEFT JOIN cities c ON o.city_id = c.id
                 LEFT JOIN districts d ON o.district_id = d.id
+                LEFT JOIN order_metadata om ON o.id = om.order_id
                 WHERE o.id = :id AND o.seller_profile_id = :seller_profile_id
             ");
             $statement->execute([
@@ -1706,7 +1723,17 @@ class SellerDashboardController extends DashboardController {
                 'seller_profile_id' => $sellerProfileId
             ]);
             $result = $statement->fetch(PDO::FETCH_ASSOC);
-            return $result ?: null;
+            
+            if (!$result) {
+                return null;
+            }
+            
+            // If phone is not set, use a default value
+            if (!isset($result['phone']) || empty($result['phone'])) {
+                $result['phone'] = 'u043du043eu043cu0435u0440 u0442u0435u043bu0435u0444u043eu043du0430 u043eu0431u044fu0437u0430u0442u0435u043bu0435u043d';
+            }
+            
+            return $result;
         } catch (\Exception $e) {
             Application::$app->logger->error(
                 'Error getting order by ID: ' . $e->getMessage(), 

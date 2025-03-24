@@ -212,9 +212,9 @@ class CheckoutController extends Controller {
                     
                     // Create order
                     $orderSql = "INSERT INTO orders (buyer_id, seller_profile_id, total_amount, status, payment_status, 
-                                    payment_method_id, city_id, district_id, address_line, delivery_fee) 
+                                    payment_method_id, city_id, district_id, address_line, delivery_fee, notes) 
                                   VALUES (:buyer_id, :seller_profile_id, :total_amount, 'new', 'unpaid', 
-                                    :payment_method_id, :city_id, :district_id, :address_line, :delivery_fee)";
+                                    :payment_method_id, :city_id, :district_id, :address_line, :delivery_fee, :notes)";
                     
                     $orderStmt = $db->prepare($orderSql);
                     $orderStmt->bindValue(':buyer_id', $userId, PDO::PARAM_INT);
@@ -225,10 +225,31 @@ class CheckoutController extends Controller {
                     $orderStmt->bindValue(':district_id', $districtId, $districtId === null ? PDO::PARAM_NULL : PDO::PARAM_INT);
                     $orderStmt->bindValue(':address_line', $addressLine, PDO::PARAM_STR);
                     $orderStmt->bindValue(':delivery_fee', $deliveryFee, PDO::PARAM_STR);
+                    $orderStmt->bindValue(':notes', $data['delivery_notes'] ?? null, PDO::PARAM_STR);
                     $orderStmt->execute();
                     
                     $orderId = $db->lastInsertId();
                     $orderIds[] = $orderId;
+                    
+                    // Save phone number to order_metadata
+                    if (!empty($data['phone'])) {
+                        try {
+                            $metadataSql = "INSERT INTO order_metadata (order_id, phone, delivery_notes) 
+                                          VALUES (:order_id, :phone, :delivery_notes)";
+                            
+                            $metadataStmt = $db->prepare($metadataSql);
+                            $metadataStmt->bindValue(':order_id', $orderId, PDO::PARAM_INT);
+                            $metadataStmt->bindValue(':phone', $data['phone'], PDO::PARAM_STR);
+                            $metadataStmt->bindValue(':delivery_notes', $data['delivery_notes'] ?? null, PDO::PARAM_STR);
+                            $metadataStmt->execute();
+                        } catch (\Exception $e) {
+                            // Log the error but continue with the order process
+                            Application::$app->logger->error('Error saving order metadata: ' . $e->getMessage(), [
+                                'order_id' => $orderId,
+                                'trace' => $e->getTraceAsString()
+                            ], 'errors.log');
+                        }
+                    }
                     
                     // Create order items
                     foreach ($sellerData['items'] as $item) {

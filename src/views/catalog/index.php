@@ -628,9 +628,9 @@
         
         // Функция для форматирования цены
         function formatPrice(price) {
-            return new Intl.NumberFormat('ru-RU', {
+            return new Intl.NumberFormat('he-IL', {
                 style: 'currency',
-                currency: 'RUB',
+                currency: 'ILS',
                 minimumFractionDigits: 0
             }).format(price);
         }
