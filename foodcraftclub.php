@@ -81,7 +81,7 @@ $cities = array(
   array('id' => '55','city_name' => 'Пардес-Хана-Каркур','district_id' => '2'),
   array('id' => '56','city_name' => 'Рош-ха-Аин','district_id' => '3'),
   array('id' => '57','city_name' => 'Шохам','district_id' => '3'),
-  array('id' => '58','city_name' => 'Бейт-Шемеш','district_id' => '5'),
+  array('id' => '58','city_name' => '3Бейт-Шемеш','district_id' => '5'),
   array('id' => '59','city_name' => 'Бейт-Шеан','district_id' => '1'),
   array('id' => '60','city_name' => 'Кирьят-Бялик','district_id' => '2'),
   array('id' => '61','city_name' => 'Кирьят-Экрон','district_id' => '3'),
@@ -182,7 +182,8 @@ $messages = array(
 
 /* `foodcraftclub`.`migrations` */
 $migrations = array(
-  array('id' => '1','migration' => 'm0001_initial.php','created_at' => '2025-03-17 15:21:13')
+  array('id' => '1','migration' => 'm0001_initial.php','created_at' => '2025-03-17 15:21:13'),
+  array('id' => '2','migration' => 'm0004_add_order_notes_and_metadata.php','created_at' => '2025-03-24 12:45:08')
 );
 
 /* `foodcraftclub`.`notifications` */
@@ -191,10 +192,26 @@ $notifications = array(
 
 /* `foodcraftclub`.`orders` */
 $orders = array(
+  array('id' => '4','buyer_id' => '1','seller_profile_id' => '1','order_date' => '2025-03-23 22:06:00','total_amount' => '2652.00','status' => 'new','payment_status' => 'unpaid','payment_method_id' => '1','city_id' => '1','district_id' => NULL,'address_line' => 'Ha agana 20 dira 9','delivery_fee' => '0.00','notes' => NULL),
+  array('id' => '5','buyer_id' => '1','seller_profile_id' => '3','order_date' => '2025-03-23 22:06:00','total_amount' => '314.00','status' => 'new','payment_status' => 'unpaid','payment_method_id' => '1','city_id' => '1','district_id' => NULL,'address_line' => 'Ha agana 20 dira 9','delivery_fee' => '50.00','notes' => NULL),
+  array('id' => '6','buyer_id' => '1','seller_profile_id' => '3','order_date' => '2025-03-23 22:07:36','total_amount' => '314.00','status' => 'delivered','payment_status' => 'unpaid','payment_method_id' => '1','city_id' => '1','district_id' => NULL,'address_line' => 'Rahel Ameshureret 23 apartment 1','delivery_fee' => '50.00','notes' => NULL),
+  array('id' => '7','buyer_id' => '1','seller_profile_id' => '1','order_date' => '2025-03-23 22:07:36','total_amount' => '1326.00','status' => 'new','payment_status' => 'unpaid','payment_method_id' => '1','city_id' => '1','district_id' => NULL,'address_line' => 'Rahel Ameshureret 23 apartment 1','delivery_fee' => '0.00','notes' => NULL)
 );
 
 /* `foodcraftclub`.`order_items` */
 $order_items = array(
+  array('id' => '1','order_id' => '4','product_id' => '5','quantity' => '2','price_at_moment' => '234.00'),
+  array('id' => '2','order_id' => '4','product_id' => '4','quantity' => '2','price_at_moment' => '858.00'),
+  array('id' => '3','order_id' => '4','product_id' => '1','quantity' => '2','price_at_moment' => '234.00'),
+  array('id' => '4','order_id' => '5','product_id' => '6','quantity' => '11','price_at_moment' => '24.00'),
+  array('id' => '5','order_id' => '6','product_id' => '6','quantity' => '11','price_at_moment' => '24.00'),
+  array('id' => '6','order_id' => '7','product_id' => '1','quantity' => '1','price_at_moment' => '234.00'),
+  array('id' => '7','order_id' => '7','product_id' => '5','quantity' => '1','price_at_moment' => '234.00'),
+  array('id' => '8','order_id' => '7','product_id' => '4','quantity' => '1','price_at_moment' => '858.00')
+);
+
+/* `foodcraftclub`.`order_metadata` */
+$order_metadata = array(
 );
 
 /* `foodcraftclub`.`payments` */
@@ -214,7 +231,7 @@ $products = array(
   array('id' => '3','seller_profile_id' => '1','product_name' => 'сдф','description' => 'сдф','price' => '234.00','is_active' => '0','available_for_preorder' => '0','created_at' => '2025-03-18 09:05:52','updated_at' => '2025-03-22 23:24:21','category_id' => '9','quantity' => '0','weight' => '1500'),
   array('id' => '4','seller_profile_id' => '1','product_name' => 'оливье-1','description' => 'асдасфдфззвжзввз','price' => '858.00','is_active' => '0','available_for_preorder' => '1','created_at' => '2025-03-18 12:47:02','updated_at' => '2025-03-22 23:24:21','category_id' => '2','quantity' => '5','weight' => '250'),
   array('id' => '5','seller_profile_id' => '1','product_name' => 'test','description' => 'asfdafsdsf','price' => '234.00','is_active' => '1','available_for_preorder' => '0','created_at' => '2025-03-22 20:51:24','updated_at' => '2025-03-22 23:24:21','category_id' => '5','quantity' => '15','weight' => '1000'),
-  array('id' => '6','seller_profile_id' => '3','product_name' => 'класйфл','description' => 'misha&#38;#38;#13;&#38;#38;#10;л;скфсф сдкйф сдкйдфгйдхфие','price' => '24.00','is_active' => '1','available_for_preorder' => '0','created_at' => '2025-03-22 23:26:25','updated_at' => '2025-03-22 23:36:15','category_id' => '8','quantity' => '22','weight' => '500')
+  array('id' => '6','seller_profile_id' => '3','product_name' => 'класйфл','description' => 'misha&#38;#38;#38;#13;&#38;#38;#38;#10;л;скфсф сдкйф сдкйдфгйдхфие','price' => '24.00','is_active' => '1','available_for_preorder' => '0','created_at' => '2025-03-22 23:26:25','updated_at' => '2025-03-23 09:12:16','category_id' => '8','quantity' => '22','weight' => '500')
 );
 
 /* `foodcraftclub`.`product_categories` */
@@ -247,17 +264,25 @@ $roles = array(
 
 /* `foodcraftclub`.`seller_delivery_areas` */
 $seller_delivery_areas = array(
+  array('id' => '3','seller_profile_id' => '3','city_id' => '1','district_id' => '5','delivery_fee' => '50.00','free_from_amount' => '500.00'),
+  array('id' => '4','seller_profile_id' => '3','city_id' => '9','district_id' => '4','delivery_fee' => '45.00','free_from_amount' => '0.00')
 );
 
 /* `foodcraftclub`.`seller_payment_options` */
 $seller_payment_options = array(
+  array('id' => '1','seller_profile_id' => '1','payment_method_id' => '1','enabled' => '1'),
+  array('id' => '2','seller_profile_id' => '1','payment_method_id' => '2','enabled' => '1'),
+  array('id' => '3','seller_profile_id' => '1','payment_method_id' => '3','enabled' => '1'),
+  array('id' => '4','seller_profile_id' => '2','payment_method_id' => '1','enabled' => '1'),
+  array('id' => '5','seller_profile_id' => '2','payment_method_id' => '2','enabled' => '1'),
+  array('id' => '6','seller_profile_id' => '2','payment_method_id' => '3','enabled' => '1')
 );
 
 /* `foodcraftclub`.`seller_profiles` */
 $seller_profiles = array(
   array('id' => '1','user_id' => '12','seller_type' => 'ordinary','min_order_amount' => '0.00','name' => 'тестовый 1 ','description' => '212','email' => 'michael.doroshenko1@gmail.com','phone' => '0504471533','avatar_url' => NULL,'created_at' => '2025-03-18 00:51:16','updated_at' => '2025-03-22 23:00:18'),
   array('id' => '2','user_id' => '14','seller_type' => 'ordinary','min_order_amount' => '0.00','name' => 'test 2 ','description' => 'adasdada','email' => 'avi@gmail.com','phone' => '0504471533','avatar_url' => '/uploads/avatars/14_1742677297.webp','created_at' => '2025-03-22 22:38:36','updated_at' => '2025-03-22 23:01:37'),
-  array('id' => '3','user_id' => '16','seller_type' => 'ordinary','min_order_amount' => '0.00','name' => 'Еси ','description' => 'хтхд','email' => '','phone' => '','avatar_url' => NULL,'created_at' => '2025-03-22 23:09:39','updated_at' => '2025-03-22 23:35:11')
+  array('id' => '3','user_id' => '16','seller_type' => 'ordinary','min_order_amount' => '250.00','name' => 'Еси ','description' => 'хтхд','email' => '','phone' => '','avatar_url' => NULL,'created_at' => '2025-03-22 23:09:39','updated_at' => '2025-03-23 18:39:28')
 );
 
 /* `foodcraftclub`.`tags` */

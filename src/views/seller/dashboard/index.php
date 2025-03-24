@@ -96,7 +96,7 @@
                     <div class="card h-100">
                         <div class="card-body">
                             <h5 class="card-title">Revenue</h5>
-                            <h2 class="card-text">$<?= number_format($stats['total_revenue'] ?? 0, 2) ?></h2>
+                            <h2 class="card-text"><?= number_format($stats['total_revenue'] ?? 0, 2) ?>₪</h2>
                             <p class="card-text text-muted">Total earnings</p>
                         </div>
                     </div>
@@ -174,7 +174,7 @@
                             <p><strong>Seller Type:</strong> <?= ucfirst($sellerProfile['seller_type'] ?? 'ordinary') ?></p>
                         </div>
                         <div class="col-md-6">
-                            <p><strong>Minimum Order:</strong> $<?= number_format($sellerProfile['min_order_amount'] ?? 0, 2) ?></p>
+                            <p><strong>Minimum Order:</strong> <?= number_format($sellerProfile['min_order_amount'] ?? 0, 2) ?>₪</p>
                             <p><strong>Member Since:</strong> <?= date('F j, Y', strtotime($user->created_at)) ?></p>
                             <p><strong>Status:</strong> <?= ucfirst($user->status) ?></p>
                         </div>

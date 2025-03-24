@@ -49,7 +49,7 @@
                         
                         <div class="row">
                             <div class="col-md-6 mb-3">
-                                <label for="productPrice" class="form-label">Цена (₽)</label>
+                                <label for="productPrice" class="form-label">Цена (₪)</label>
                                 <input type="number" class="form-control" id="productPrice" name="price" step="0.01" min="0" required>
                                 <div class="form-text">Укажите цену в рублях</div>
                             </div>

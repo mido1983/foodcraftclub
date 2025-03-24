@@ -62,7 +62,7 @@
                                     </td>
                                     <td><?= htmlspecialchars($product['product_name']) ?></td>
                                     <td><?= htmlspecialchars($product['category_name'] ?? 'Без категории') ?></td>
-                                    <td><?= number_format($product['price'], 2) ?> ₽</td>
+                                    <td><?= number_format($product['price'], 2) ?> ₪</td>
                                     <td><?= isset($product['quantity']) ? $product['quantity'] : '1' ?></td>
                                     <td><?= isset($product['weight']) ? $product['weight'] : '0' ?></td>
                                     <td>
@@ -128,7 +128,7 @@
                     </div>
                     <div class="row">
                         <div class="col-md-6 mb-3">
-                            <label for="editProductPrice" class="form-label">Цена (₽)</label>
+                            <label for="editProductPrice" class="form-label">Цена (₪)</label>
                             <input type="number" class="form-control" id="editProductPrice" name="price" step="0.01" min="0">
                         </div>
                         <div class="col-md-6 mb-3">
