@@ -8,6 +8,7 @@ class Session {
     protected const FLASH_KEY = 'flash_messages';
     protected const USER_KEY = 'user';
     protected const ROLES_KEY = 'user_roles';
+    protected const CSRF_TOKEN = 'csrf_token';
 
     private ?User $user = null;
 
@@ -145,6 +146,41 @@ class Session {
      */
     public function isLoggedIn(): bool {
         return $this->user !== null;
+    }
+
+    /**
+     * Generate a CSRF token and store it in the session
+     * @return string Generated CSRF token
+     */
+    public function generateCsrfToken(): string {
+        $token = bin2hex(random_bytes(32));
+        $this->set(self::CSRF_TOKEN, $token);
+        return $token;
+    }
+
+    /**
+     * Get the current CSRF token or generate a new one if it doesn't exist
+     * @return string CSRF token
+     */
+    public function getCsrfToken(): string {
+        $token = $this->get(self::CSRF_TOKEN);
+        if (!$token) {
+            $token = $this->generateCsrfToken();
+        }
+        return $token;
+    }
+
+    /**
+     * Validate a CSRF token against the one stored in the session
+     * @param string $token Token to validate
+     * @return bool True if token is valid, false otherwise
+     */
+    public function validateCsrfToken(string $token): bool {
+        $storedToken = $this->get(self::CSRF_TOKEN);
+        if (!$storedToken) {
+            return false;
+        }
+        return hash_equals($storedToken, $token);
     }
 
     /**

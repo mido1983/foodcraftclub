@@ -50,13 +50,27 @@ class Request {
         try {
             if ($this->isGet()) {
                 foreach ($_GET as $key => $value) {
-                    $body[$key] = filter_input(INPUT_GET, $key, FILTER_SANITIZE_SPECIAL_CHARS);
+                    if (is_array($value)) {
+                        // Обработка массивов (например, для чекбоксов с одинаковыми именами)
+                        $body[$key] = array_map(function($item) {
+                            return htmlspecialchars($item, ENT_QUOTES, 'UTF-8');
+                        }, $value);
+                    } else {
+                        $body[$key] = filter_input(INPUT_GET, $key, FILTER_SANITIZE_SPECIAL_CHARS);
+                    }
                 }
             }
             
             if ($this->isPost()) {
                 foreach ($_POST as $key => $value) {
-                    $body[$key] = filter_input(INPUT_POST, $key, FILTER_SANITIZE_SPECIAL_CHARS);
+                    if (is_array($value)) {
+                        // Обработка массивов (например, для чекбоксов с одинаковыми именами)
+                        $body[$key] = array_map(function($item) {
+                            return htmlspecialchars($item, ENT_QUOTES, 'UTF-8');
+                        }, $value);
+                    } else {
+                        $body[$key] = filter_input(INPUT_POST, $key, FILTER_SANITIZE_SPECIAL_CHARS);
+                    }
                 }
             }
         } catch (\Exception $e) {
@@ -76,8 +90,25 @@ class Request {
      * @return bool True if AJAX request
      */
     public function isAjax(): bool {
-        return isset($_SERVER['HTTP_X_REQUESTED_WITH']) && 
-               $_SERVER['HTTP_X_REQUESTED_WITH'] === 'XMLHttpRequest';
+        // Проверка традиционного заголовка XMLHttpRequest
+        if (isset($_SERVER['HTTP_X_REQUESTED_WITH']) && 
+            $_SERVER['HTTP_X_REQUESTED_WITH'] === 'XMLHttpRequest') {
+            return true;
+        }
+        
+        // Проверка заголовка Content-Type для JSON API запросов
+        if (isset($_SERVER['CONTENT_TYPE']) && 
+            strpos($_SERVER['CONTENT_TYPE'], 'application/json') !== false) {
+            return true;
+        }
+        
+        // Проверка заголовка Accept для ожидаемых JSON ответов
+        if (isset($_SERVER['HTTP_ACCEPT']) && 
+            strpos($_SERVER['HTTP_ACCEPT'], 'application/json') !== false) {
+            return true;
+        }
+        
+        return false;
     }
 
     /**
@@ -101,5 +132,33 @@ class Request {
             );
             return null;
         }
+    }
+    
+    /**
+     * Alias for getJson() - for backward compatibility
+     * @return array|null Decoded JSON data or null on error
+     */
+    public function getJsonBody(): ?array {
+        return $this->getJson();
+    }
+    
+    /**
+     * Get header value
+     * @param string $name Header name
+     * @return string|null Header value or null if not exists
+     */
+    public function getHeader(string $name): ?string {
+        $headerName = 'HTTP_' . str_replace('-', '_', strtoupper($name));
+        return $_SERVER[$headerName] ?? null;
+    }
+    
+    /**
+     * Get base URL of the application
+     * @return string Base URL
+     */
+    public function getBaseUrl(): string {
+        $protocol = isset($_SERVER['HTTPS']) && $_SERVER['HTTPS'] === 'on' ? 'https' : 'http';
+        $host = $_SERVER['HTTP_HOST'] ?? 'localhost';
+        return $protocol . '://' . $host;
     }
 }

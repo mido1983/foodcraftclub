@@ -383,45 +383,24 @@ class SellerDashboardController extends DashboardController {
         return $this->render('seller/products/new', [
             'user' => $user,
             'sellerProfile' => $sellerProfile,
-            'categories' => $this->getCategories()
+            'categories' => $this->getCategories(),
+            'ingredients' => $this->getBaseIngredients()
         ]);
     }
     
     /**
-     * u041fu0440u0435u043eu0431u0440u0430u0437u0443u0435u043du0438u0435 u0441u043fu0438u0441u043au0430 u0432u0441u0435u0445 u043au0430u0442u0435u0433u043eu0440u0438u0439
-     * @return array u0421u043fu0438u0441u043eu043a u043au0430u0442u0435u0433u043eu0440u0438u0439
-     */
-    protected function getCategories(): array {
-        try {
-            $sql = "SELECT id, name, description FROM categories";
-            $statement = Application::$app->db->prepare($sql);
-            $statement->execute();
-            return $statement->fetchAll(PDO::FETCH_ASSOC);
-        } catch (\Exception $e) {
-            // u0417u0430u043fu0440u043eu0441 u043eu0448u0438u0431u043au0438 u0432 u043bu043eu0433
-            Application::$app->logger->error(
-                'u041eu0448u0438u0431u043au0430 u043fu0440u0438 u043fu0435u043cu0430u0435u043c u043au0430u0442u0435u0433u043eu0440u0438u0439: ' . $e->getMessage(),
-                ['trace' => $e->getTraceAsString()],
-                'errors.log'
-            );
-            return [];
-        }
-    }
-
-    /**
-     * u041eu0431u043du043e0432u043bu0435u043du0438u0435 u043fu0440u043e0434u0443u043a0442u0430
-     * 
-     * @return string
+     * Обновление и редактирование продукта
+     * @return string|Response
      */
     public function updateProduct() {
         if (!$this->request->isPost()) {
-            return $this->response->redirect('/seller/products');
+            return Application::$app->response->redirect('/seller/products');
         }
         
         try {
             $user = $this->getUserProfile();
             if (!$user) {
-                Application::$app->session->setFlash('error', 'u0412u044b u0434u043eu043bu0436u043du044b u0431u044bu0442u044c u0430u0432u0442u043eu0440u0438u0437u043eu0430u043du044f');
+                Application::$app->session->setFlash('error', 'Вы должны быть авторизованы');
                 return Application::$app->response->redirect('/login');
             }
             
@@ -431,57 +410,19 @@ class SellerDashboardController extends DashboardController {
                     'Attempt to access new product page without seller profile', 
                     ['user_id' => $user->id]
                 );
-                Application::$app->session->setFlash('error', 'u0423 u0432u0430u0441 u043du0435u0442 u043fu0440u043eu0444u0438u043b044a u043fu0440u043eu0441u043bu0435 u043fu0440u043eu0441u043bu0435 u043fu0440u043eu0434u0430u0432u0446u0430');
+                Application::$app->session->setFlash('error', 'У вас нет профиля продавца');
                 return Application::$app->response->redirect('/seller/profile');
             }
             
             $body = $this->request->getBody();
             
-            // u041fu0440u0435u043eu0431u0440u0430u0437u0443u0435u043c u043du0430 u043du0430u043lu0438u0447u0438u0435 u043eu0431u044fu0437u0430u0442u0435u043lu044cu043du044bu0443 u043fu0440u043eu0444u0438u043lu044h
+            // Проверка на наличие обязательных полей
             if (empty($body['id']) || empty($body['product_name']) || empty($body['price'])) {
-                Application::$app->session->setFlash('error', 'u041du0435u043e0431u0445043e04340438u043cu043e u04370430043f043e043b043du0438u0442u044c u0432 u0430u043au0442u0438u0432u043du043eu0439 u0444u043eu0440u043c0435');
+                Application::$app->session->setFlash('error', 'Необходимо заполнить все обязательные поля');
                 return Application::$app->response->redirect('/seller/products');
             }
             
-            // u041fu0440u0435u0437u0430u0433u0440u0443u0437u0430u0435u043c u0432 u043cu0430u0441u0441u0438u0432 ID
-                
-            // u041fu0440u0435u0437u0430u0433u0440u0443u0437u0430u0435u043c u0432 u043cu0430u0441u0441u0438u0432 ID
-            $db = Application::$app->db;
-            $checkStatement = $db->prepare("
-                SELECT p.* FROM products p
-                WHERE p.id = :id AND p.seller_profile_id = :seller_profile_id
-            ");
-            
-            $checkStatement->execute([
-                'id' => $body['id'],
-                'seller_profile_id' => $sellerProfile['id']
-            ]);
-            
-            $product = $checkStatement->fetch(PDO::FETCH_ASSOC);
-            if (!$product) {
-                Application::$app->session->setFlash('error', 'u041f0440u043e0434u0443u043a0442 u043du0435 u043du0430u043904340435u043du044a u0438u043b0438 u0443 u04320430u0441 u043du0435u0442 u043f04400430u0435u0432 u043d0430 u0435u0433u043e u0440043504340430u043a04420438u0440u043eu0440u043eu044fn0438u0435');
-                return Application::$app->response->redirect('/seller/products');
-            }
-            
-            // u041eu0431u0440u0430u0431u043eu0442u043au0430 POST-u0437u0430u043fu0440u043eu0441u0430 u0434u043bu044f u043e0431u043du043e0432u043bu0435u043du0438u044f u043fu0440u043eu0444u0438u043lu044h
-            if (isset($body['product_status'])) {
-                switch ($body['product_status']) {
-                    case 'active':
-                        $isActive = 1;
-                        $isPreorder = 0;
-                        break;
-                    case 'inactive':
-                        $isActive = 0;
-                        $isPreorder = 0;
-                        break;
-                    case 'preorder':
-                        $isActive = 1;
-                        $isPreorder = 1;
-                        break;
-                }
-            }
-            
-            // u041eu0431u0440u0430u0431u043eu0442u043au0430 u0441u043fu043e0440u0430 u0437u0430u0433u0440u0443u0437u043a0438 u0430u0432u0430u0442u0430u0440u0430
+            // Проверка наличия изображения
             if (isset($_FILES['image']) && $_FILES['image']['error'] === UPLOAD_ERR_OK) {
                 $allowedTypes = ['image/avif', 'image/webp'];
                 $maxSize = 100 * 1024; // 100KB
@@ -489,7 +430,7 @@ class SellerDashboardController extends DashboardController {
                 if (in_array($_FILES['image']['type'], $allowedTypes) && $_FILES['image']['size'] <= $maxSize) {
                     $uploadDir = __DIR__ . '/../../public/uploads/products/';
                     
-                    // u0421u043eu0437u0434u0430u0435u043c u0434u0438u0440u0435u043au0442u043eu0440u0438u044e, u0435u0441u043lu0438 u043eu043du0430 u043du0435 u0441u0443u0447u0435u0441u0442u0432u0443u0435u0442
+                    // Создание директории, если она не существует
                     if (!file_exists($uploadDir)) {
                         mkdir($uploadDir, 0755, true);
                     }
@@ -498,16 +439,16 @@ class SellerDashboardController extends DashboardController {
                     $filePath = $uploadDir . $fileName;
                     
                     if (move_uploaded_file($_FILES['image']['tmp_name'], $filePath)) {
-                        // u041eu0431u043du043e0432u043bu044fu0435u043c u04380437043e0431u0440043004360435u043d0438u044f u0432 u044204300431u043b0438u04460435 product_images
-                        $imageStatement = $db->prepare("
+                        // Обновление изображения в базе данных
+                        $imageStatement = Application::$app->db->prepare("
                             SELECT id FROM product_images WHERE product_id = :product_id AND is_main = 1
                         ");
                         $imageStatement->execute(['product_id' => $body['id']]);
                         $mainImage = $imageStatement->fetch(PDO::FETCH_ASSOC);
                         
                         if ($mainImage) {
-                            // u041eu0431u043du043e0432u043bu044fu0435u043c u0441u0443u04490435u0441u044204320443u0435u04490435u0435 u04380437043e0431u0440043004360435u043d0438u044f
-                            $updateImageStatement = $db->prepare("
+                            // Обновление существующего изображения
+                            $updateImageStatement = Application::$app->db->prepare("
                                 UPDATE product_images SET image_url = :image_url WHERE id = :id
                             ");
                             $updateImageStatement->execute([
@@ -515,8 +456,8 @@ class SellerDashboardController extends DashboardController {
                                 'image_url' => '/uploads/products/' . $fileName
                             ]);
                         } else {
-                            // u0421u043eu0437u0434u0430u0435u043c u043du043e0432u043eu0435 u0438u0437u043e0431u0440u0430u0437u0435u043du0438u0435
-                            $insertImageStatement = $db->prepare("
+                            // Добавление нового изображения
+                            $insertImageStatement = Application::$app->db->prepare("
                                 INSERT INTO product_images (product_id, image_url, is_main)
                                 VALUES (:product_id, :image_url, :is_main)
                             ");
@@ -527,181 +468,13 @@ class SellerDashboardController extends DashboardController {
                             ]);
                         }
                     } else {
-                        throw new \Exception('u041e0430440438u0438u0431043a0430 u043f04400438 u0437043004330430270435u043du0438u0438 u04380437043e0431u0440043004360435u043d0438u044f');
+                        throw new \Exception('Ошибка при загрузке изображения');
                     }
-                } else {
-                    throw new \Exception('u041du04350434043e043f043004330430u04410438u043cu0438 u04420438u0430u043f u0438u043b0438 u044004300437u043cu0435u0440 u04380437043e0431u0440043004360435u043d0438u044f');
                 }
             }
             
-            // u041eu0431u0440u0430u0431u043eu0442u043au0430 u0441u043fu043e0440u0430 u0437u0430u0433u0440u0443u0437u043a0438 u0430u0432u0430u0442u0430u0440u0430
-            if (isset($data['payment_methods']) && is_array($data['payment_methods'])) {
-                // u041fu0440u0435u0437u0430u0433u0440u0443u0437u0430u0435u043c u0432 u043cu0430u0441u0441u0438u0432 ID
-                
-                // u041fu0440u0435u0437u0430u0433u0440u0443u0437u0430u0435u043c u0432 u043cu0430u0441u0441u0438u0432 ID
-                Application::$app->logger->info(
-                    'Attempting to add payment methods', 
-                    ['user_id' => $user->id, 'seller_profile_id' => $sellerProfile['id'], 'methods' => $data['payment_methods']],
-                    'users.log'
-                );
-                
-                // Сначала проверим структуру таблицы
-                try {
-                    $tableStmt = $db->prepare("SHOW TABLES LIKE 'seller_payment_options'");
-                    $tableStmt->execute();
-                    if (!$tableStmt->fetch()) {
-                        // Таблица не существует, создаем её
-                        $createTableStmt = $db->prepare("
-                            CREATE TABLE IF NOT EXISTS seller_payment_options (
-                                id INT AUTO_INCREMENT PRIMARY KEY,
-                                seller_profile_id INT NOT NULL,
-                                payment_method_id INT NOT NULL,
-                                enabled TINYINT(1) NOT NULL DEFAULT 1,
-                                created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
-                                UNIQUE KEY unique_seller_payment (seller_profile_id, payment_method_id)
-                            ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
-                        ");
-                        $createTableStmt->execute();
-                        Application::$app->logger->info('Created seller_payment_options table', [], 'users.log');
-                    }
-                } catch (\Exception $e) {
-                    Application::$app->logger->error(
-                        'Error checking/creating table', 
-                        ['error' => $e->getMessage()],
-                        'errors.log'
-                    );
-                }
-                
-                // u0423u0434u0430u043bu0438u0435u043c u0442u0435u043au0443u0447u0438u0435 u0441u043fu043e0440u0430 u0437u0430u0433u0440u0443u0437u043a0438 u0430u0432u0430u0442u0430u0440u0430
-                try {
-                    $deletePaymentStmt = $db->prepare("DELETE FROM seller_payment_options WHERE seller_profile_id = :seller_profile_id");
-                    $deletePaymentStmt->execute(['seller_profile_id' => $sellerProfile['id']]);
-                    Application::$app->logger->info(
-                        'Deleted existing payment methods', 
-                        ['seller_profile_id' => $sellerProfile['id']],
-                        'users.log'
-                    );
-                } catch (\Exception $e) {
-                    Application::$app->logger->error(
-                        'Error deleting payment methods', 
-                        ['error' => $e->getMessage()],
-                        'errors.log'
-                    );
-                }
-                
-                // u0414u043eu0431u0430u0432u043bu0435u043du0438u0435 u043du0435u0432u044b u0441u043fu043e0440u0430 u0437u0430u0433u0440u0443u0437u043a0438 u0430u0432u0430u0442u0430u0440u0430
-                foreach ($data['payment_methods'] as $methodId) {
-                    // Простая проверка на валидность ID метода оплаты
-                    if (!is_numeric($methodId) || (int)$methodId <= 0) {
-                        Application::$app->logger->error(
-                            'Invalid payment method ID', 
-                            ['user_id' => $user->id, 'method_id' => $methodId],
-                            'errors.log'
-                        );
-                        continue;
-                    }
-                    
-                    // Проверяем, существует ли метод оплаты
-                    $checkMethodStmt = $db->prepare("SELECT id FROM payment_methods WHERE id = :id");
-                    $checkMethodStmt->execute(['id' => (int)$methodId]);
-                    if (!$checkMethodStmt->fetch()) {
-                        Application::$app->logger->error(
-                            'Payment method does not exist', 
-                            ['user_id' => $user->id, 'method_id' => $methodId],
-                            'errors.log'
-                        );
-                        continue;
-                    }
-                    
-                    // Логируем попытку добавления
-                    Application::$app->logger->info(
-                        'Attempting to add payment method', 
-                        ['user_id' => $user->id, 'seller_profile_id' => $sellerProfile['id'], 'method_id' => $methodId],
-                        'users.log'
-                    );
-                    
-                    try {
-                        // Используем максимально простой запрос
-                        $sql = "INSERT INTO seller_payment_options (seller_profile_id, payment_method_id, enabled) VALUES (?, ?, ?)"; 
-                        $insertPaymentStmt = $db->prepare($sql);
-                        $insertResult = $insertPaymentStmt->execute([(int)$sellerProfile['id'], (int)$methodId, 1]);
-                        
-                        // Логируем результат
-                        if (!$insertResult) {
-                            $errorInfo = $insertPaymentStmt->errorInfo();
-                            Application::$app->logger->error(
-                                'Failed to add payment method', 
-                                ['user_id' => $user->id, 'error' => $errorInfo],
-                                'errors.log'
-                            );
-                        } else {
-                            Application::$app->logger->info(
-                                'Payment method added successfully', 
-                                ['user_id' => $user->id, 'method_id' => $methodId],
-                                'users.log'
-                            );
-                        }
-                    } catch (\Exception $e) {
-                        Application::$app->logger->error(
-                            'Exception adding payment method', 
-                            ['user_id' => $user->id, 'error' => $e->getMessage()],
-                            'errors.log'
-                        );
-                    }
-                }
-                
-                // Логируем выбранные способы оплаты
-                Application::$app->logger->info(
-                    'Payment methods selected', 
-                    ['user_id' => $user->id, 'seller_profile_id' => $sellerProfile['id'], 'methods' => $data['payment_methods']],
-                    'users.log'
-                );
-            } else {
-                // Если не выбрано ни одного способа оплаты, удаляем все существующие
-                $deletePaymentStmt = $db->prepare("DELETE FROM seller_payment_options WHERE seller_profile_id = :seller_profile_id");
-                $deletePaymentStmt->execute(['seller_profile_id' => $sellerProfile['id']]);
-                
-                // Логируем удаление всех способов оплаты
-                Application::$app->logger->info(
-                    'All payment methods removed', 
-                    ['user_id' => $user->id, 'seller_profile_id' => $sellerProfile['id']],
-                    'users.log'
-                );
-            }
-            
-            // u041eu0431u0440u0430u0431u043eu0442u043au0430 u0441u043fu043e0440u0430 u0437u0430u0433u0440u0443u0437u043a0438 u0430u0432u0430u0442u0430u0440u0430
-            if (isset($_FILES['avatar']) && $_FILES['avatar']['error'] === UPLOAD_ERR_OK) {
-                $allowedTypes = ['image/avif', 'image/webp'];
-                $maxSize = 100 * 1024; // 100KB
-                
-                if (in_array($_FILES['avatar']['type'], $allowedTypes) && $_FILES['avatar']['size'] <= $maxSize) {
-                    $uploadDir = __DIR__ . '/../../public/uploads/avatars/';
-                    
-                    // u0421u043eu0437u0434u0430u0435u043c u0434u0438u0440u0435u043au0442u043eu0440u0438u044e, u0435u0441u043lu0438 u043eu043du0430 u043du0435 u0441u0443u0447u0435u0441u0442u0432u0443u0435u0442
-                    if (!file_exists($uploadDir)) {
-                        mkdir($uploadDir, 0755, true);
-                    }
-                    
-                    $fileName = $user->id . '_' . time() . '.' . pathinfo($_FILES['avatar']['name'], PATHINFO_EXTENSION);
-                    $filePath = $uploadDir . $fileName;
-                    
-                    if (move_uploaded_file($_FILES['avatar']['tmp_name'], $filePath)) {
-                        // u041eu0431u043du043e0432u043bu044fu0435u043c u04380437043e0431u0440043004360435u043d0438u044f u0432 u0431u0430u0437u0435 u0434u0430u043du043du044bu0443
-                        $avatarUpdateStmt = $db->prepare("UPDATE seller_profiles SET avatar_url = :avatar_url WHERE user_id = :user_id");
-                        $avatarUpdateStmt->execute([
-                            'user_id' => $user->id,
-                            'avatar_url' => '/uploads/avatars/' . $fileName
-                        ]);
-                    } else {
-                        $errors[] = 'Failed to upload avatar';
-                    }
-                } else {
-                    $errors[] = 'Invalid avatar file. Only AVIF and WebP formats are allowed, max size 100KB';
-                }
-            }
-            
-            // u041eu0431u0440u0430u0431u043eu0442u043au0430 u0441u043fu043e0440u0430 u0437u0430u0433u0440u0443u0437u043a0438 u0430u0432u0430u0442u0430u0440u0430
-            $updateStatement = $db->prepare("
+            // Обновление данных продукта
+            $updateStatement = Application::$app->db->prepare("
                 UPDATE products SET
                     product_name = :product_name,
                     description = :description,
@@ -719,11 +492,11 @@ class SellerDashboardController extends DashboardController {
                 'product_name' => $body['product_name'],
                 'description' => $body['description'],
                 'price' => floatval($body['price']),
-                'is_active' => $isActive,
-                'available_for_preorder' => $isPreorder,
+                'is_active' => $body['product_status'] === 'active' ? 1 : 0,
+                'available_for_preorder' => $body['product_status'] === 'preorder' ? 1 : 0,
                 'quantity' => isset($body['quantity']) ? intval($body['quantity']) : 1,
                 'weight' => isset($body['weight']) ? intval($body['weight']) : 0,
-                'category_id' => isset($body['category_id']) ? intval($body['category_id']) : null,
+                'category_id' => !empty($body['category_id']) ? intval($body['category_id']) : null,
                 'seller_profile_id' => $sellerProfile['id']
             ]);
             
@@ -734,9 +507,207 @@ class SellerDashboardController extends DashboardController {
                     'products.log'
                 );
                 
-                Application::$app->session->setFlash('success', 'u041f0440u043e0434u0443u043a0442 u0443u0441u043f0435u0448u043du043e u043e0431u043du043e0432u043b0435u043d');
+                // Обработка методов оплаты
+                if (isset($body['payment_methods']) && is_array($body['payment_methods'])) {
+                    Application::$app->logger->info(
+                        'Attempting to add payment methods', 
+                        ['user_id' => $user->id, 'seller_profile_id' => $sellerProfile['id'], 'methods' => $body['payment_methods']],
+                        'users.log'
+                    );
+                    
+                    // Проверка структуры таблицы
+                    try {
+                        $tableStmt = Application::$app->db->prepare("SHOW TABLES LIKE 'seller_payment_options'");
+                        $tableStmt->execute();
+                        if (!$tableStmt->fetch()) {
+                            // Таблица не существует, создаем её
+                            $createTableStmt = Application::$app->db->prepare("
+                                CREATE TABLE IF NOT EXISTS seller_payment_options (
+                                    id INT AUTO_INCREMENT PRIMARY KEY,
+                                    seller_profile_id INT NOT NULL,
+                                    payment_method_id INT NOT NULL,
+                                    enabled TINYINT(1) NOT NULL DEFAULT 1,
+                                    created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+                                    UNIQUE KEY unique_seller_payment (seller_profile_id, payment_method_id)
+                                ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
+                            ");
+                            $createTableStmt->execute();
+                            Application::$app->logger->info('Created seller_payment_options table', [], 'users.log');
+                        }
+                    } catch (\Exception $e) {
+                        Application::$app->logger->error(
+                            'Error checking/creating table', 
+                            ['error' => $e->getMessage()],
+                            'errors.log'
+                        );
+                    }
+                    
+                    // Удаляем текущие методы оплаты
+                    try {
+                        $deletePaymentStmt = Application::$app->db->prepare("DELETE FROM seller_payment_options WHERE seller_profile_id = :seller_profile_id");
+                        $deletePaymentStmt->execute(['seller_profile_id' => $sellerProfile['id']]);
+                        Application::$app->logger->info(
+                            'Deleted existing payment methods', 
+                            ['seller_profile_id' => $sellerProfile['id']],
+                            'users.log'
+                        );
+                    } catch (\Exception $e) {
+                        Application::$app->logger->error(
+                            'Error deleting payment methods', 
+                            ['error' => $e->getMessage()],
+                            'errors.log'
+                        );
+                    }
+                    
+                    // Добавление новых методов оплаты
+                    foreach ($body['payment_methods'] as $methodId) {
+                        // Проверка валидности ID метода оплаты
+                        if (!is_numeric($methodId) || (int)$methodId <= 0) {
+                            Application::$app->logger->error(
+                                'Invalid payment method ID', 
+                                ['user_id' => $user->id, 'method_id' => $methodId],
+                                'errors.log'
+                            );
+                            continue;
+                        }
+                        
+                        // Проверяем существование метода оплаты
+                        $checkMethodStmt = Application::$app->db->prepare("SELECT id FROM payment_methods WHERE id = :id");
+                        $checkMethodStmt->execute(['id' => (int)$methodId]);
+                        $method = $checkMethodStmt->fetch();
+                        
+                        if (!$method) {
+                            Application::$app->logger->error(
+                                'Payment method does not exist', 
+                                ['user_id' => $user->id, 'method_id' => $methodId],
+                                'errors.log'
+                            );
+                            continue;
+                        }
+                        
+                        // Логируем попытку добавления
+                        Application::$app->logger->info(
+                            'Attempting to add payment method', 
+                            ['user_id' => $user->id, 'seller_profile_id' => $sellerProfile['id'], 'method_id' => $methodId],
+                            'users.log'
+                        );
+                        
+                        try {
+                            // Используем максимально простой запрос
+                            $sql = "INSERT INTO seller_payment_options (seller_profile_id, payment_method_id, enabled) VALUES (?, ?, ?)"; 
+                            $insertPaymentStmt = Application::$app->db->prepare($sql);
+                            $insertResult = $insertPaymentStmt->execute([(int)$sellerProfile['id'], (int)$methodId, 1]);
+                            
+                            // Логируем результат
+                            if (!$insertResult) {
+                                $errorInfo = $insertPaymentStmt->errorInfo();
+                                Application::$app->logger->error(
+                                    'Failed to add payment method', 
+                                    ['user_id' => $user->id, 'error' => $errorInfo],
+                                    'errors.log'
+                                );
+                            } else {
+                                Application::$app->logger->info(
+                                    'Payment method added successfully', 
+                                    ['user_id' => $user->id, 'method_id' => $methodId],
+                                    'users.log'
+                                );
+                            }
+                        } catch (\Exception $e) {
+                            Application::$app->logger->error(
+                                'Exception adding payment method', 
+                                ['user_id' => $user->id, 'error' => $e->getMessage()],
+                                'errors.log'
+                            );
+                        }
+                    }
+                    
+                    // Логируем выбранные способы оплаты
+                    Application::$app->logger->info(
+                        'Payment methods selected', 
+                        ['user_id' => $user->id, 'seller_profile_id' => $sellerProfile['id'], 'methods' => $body['payment_methods']],
+                        'users.log'
+                    );
+                } else {
+                    // Если не выбрано ни одного способа оплаты, удаляем все существующие
+                    try {
+                        $deletePaymentStmt = Application::$app->db->prepare("DELETE FROM seller_payment_options WHERE seller_profile_id = :seller_profile_id");
+                        $deletePaymentStmt->execute(['seller_profile_id' => $sellerProfile['id']]);
+                        
+                        // Логируем удаление всех способов оплаты
+                        Application::$app->logger->info(
+                            'All payment methods removed', 
+                            ['user_id' => $user->id, 'seller_profile_id' => $sellerProfile['id']],
+                            'users.log'
+                        );
+                    } catch (\Exception $e) {
+                        Application::$app->logger->error(
+                            'Error removing payment methods', 
+                            ['error' => $e->getMessage()],
+                            'errors.log'
+                        );
+                    }
+                }
+                
+                // Обработка загрузки аватара
+                if (isset($_FILES['avatar']) && $_FILES['avatar']['error'] === UPLOAD_ERR_OK) {
+                    $allowedTypes = ['image/avif', 'image/webp'];
+                    $maxSize = 100 * 1024; // 100KB
+                    
+                    if (in_array($_FILES['avatar']['type'], $allowedTypes) && $_FILES['avatar']['size'] <= $maxSize) {
+                        $uploadDir = __DIR__ . '/../../public/uploads/avatars/';
+                        
+                        // Создаем директорию, если она не существует
+                        if (!file_exists($uploadDir)) {
+                            mkdir($uploadDir, 0755, true);
+                        }
+                        
+                        $fileName = $user->id . '_' . time() . '.' . pathinfo($_FILES['avatar']['name'], PATHINFO_EXTENSION);
+                        $filePath = $uploadDir . $fileName;
+                        
+                        if (move_uploaded_file($_FILES['avatar']['tmp_name'], $filePath)) {
+                            // Обновляем изображение в базе данных
+                            try {
+                                $avatarUpdateStmt = Application::$app->db->prepare("UPDATE seller_profiles SET avatar_url = :avatar_url WHERE user_id = :user_id");
+                                $avatarUpdateStmt->execute([
+                                    'user_id' => $user->id,
+                                    'avatar_url' => '/uploads/avatars/' . $fileName
+                                ]);
+                                
+                                Application::$app->logger->info(
+                                    'Avatar updated successfully', 
+                                    ['user_id' => $user->id, 'avatar_url' => '/uploads/avatars/' . $fileName],
+                                    'users.log'
+                                );
+                            } catch (\Exception $e) {
+                                Application::$app->logger->error(
+                                    'Error updating avatar in database', 
+                                    ['user_id' => $user->id, 'error' => $e->getMessage()],
+                                    'errors.log'
+                                );
+                                $errors[] = 'Failed to update avatar in database';
+                            }
+                        } else {
+                            Application::$app->logger->error(
+                                'Failed to move uploaded avatar', 
+                                ['user_id' => $user->id, 'tmp_name' => $_FILES['avatar']['tmp_name'], 'target' => $filePath],
+                                'errors.log'
+                            );
+                            $errors[] = 'Failed to upload avatar';
+                        }
+                    } else {
+                        Application::$app->logger->error(
+                            'Invalid avatar file', 
+                            ['user_id' => $user->id, 'type' => $_FILES['avatar']['type'], 'size' => $_FILES['avatar']['size']],
+                            'errors.log'
+                        );
+                        $errors[] = 'Invalid avatar file. Only AVIF and WebP formats are allowed, max size 100KB';
+                    }
+                }
+                
+                Application::$app->session->setFlash('success', 'Продукт успешно обновлен');
             } else {
-                throw new \Exception('u041e0430440438u0438u0431043a0430 u043f04400438 u043o0431u043du043e0432u043b0435u043d0438u0438 u043f0440u043e0434u0443u043a0442u0430');
+                throw new \Exception('Ошибка при обновлении продукта');
             }
             
             return Application::$app->response->redirect('/seller/products');
@@ -747,13 +718,11 @@ class SellerDashboardController extends DashboardController {
                 ['user_id' => $user->id ?? null, 'error' => $e->getMessage()]
             );
             
-            Application::$app->session->setFlash('error', 'u041e0430440438u0438u0431043a0430 u043f04400438 u043o0431u043du043e0432u043b0435u043d0438u0438 u043f0440u043e0434u0443u043a0442u0430: ' . $e->getMessage());
+            Application::$app->session->setFlash('error', 'Ошибка при обновлении продукта: ' . $e->getMessage());
             return Application::$app->response->redirect('/seller/products');
         }
     }
 
-    // Отображение и управление зонами доставки продавца
-    // @return string
     public function deliveryAreas() {
         $this->view->title = 'Delivery Areas Management';
         
@@ -774,7 +743,6 @@ class SellerDashboardController extends DashboardController {
                 return '';
             }
             
-            // Получение списка городов из базы данных
             $db = Application::$app->db;
             $citiesStatement = $db->prepare("SELECT * FROM cities");
             $citiesStatement->execute();
@@ -845,16 +813,15 @@ class SellerDashboardController extends DashboardController {
                 $deliveryFee = $_POST['delivery_fee'] ?? 0;
                 $minOrderAmount = $_POST['min_order_amount'] ?? 0;
                 
-                // u041fu0440u0435u0437u0430u0433u0440u0443u0437u0430u0435u043c u043du0430 u043du0430u043lu0438u0447u0438u0435 u043eu0431u044fu0437u0430u0442u0435u043lu044cu043du044bu0443 u043fu0440u043eu0444u0438u043lu044h
+                // Проверка наличия обязательных полей
                 if (!$cityId || !$districtId) {
                     Application::$app->session->setFlash('error', 'City and district are required fields');
                     Application::$app->response->redirect('/seller/delivery-areas');
                     return '';
                 }
                 
-                // u041fu0440u0435u0437u0430u0433u0440u0443u0437u0430u0435u043c u043du0430 u0441u0443u0447u0435u0441u0442u0432u043eu0432u0430u043du0438u0435 u0433u043eu0440u043eu0434u0430 u0438 u0440u0430u0439u043eu043du0430
+                // Проверка существования города и района
                 $db = Application::$app->db;
-                
                 $cityCheck = $db->prepare("SELECT id FROM cities WHERE id = :id");
                 $cityCheck->execute(['id' => $cityId]);
                 $city = $cityCheck->fetch(PDO::FETCH_ASSOC);
@@ -875,9 +842,7 @@ class SellerDashboardController extends DashboardController {
                     return '';
                 }
                 
-                // u041fu0440u0435u0437u0430u0433u0440u0443u0437u0430u0435u043c u0432 u043cu0430u0441u0441u0438u0432 ID
-                
-                // u041fu0440u0435u0437u0430u0433u0440u0443u0437u0430u0435u043c u0432 u043cu0430u0441u0441u0438u0432 ID
+                // Проверка существования зоны доставки
                 $existingCheck = $db->prepare("
                     SELECT id FROM seller_delivery_areas 
                     WHERE seller_profile_id = :seller_profile_id 
@@ -899,7 +864,7 @@ class SellerDashboardController extends DashboardController {
                     return '';
                 }
                 
-                // u0414u043eu0431u0430u0432u043bu0435u043du0438u0435 u043du0435u0432u043eu0439 u0437u043eu043du044b u0434u043eu0441u0442u0430u0432u043au0438
+                // Добавление новой зоны доставки
                 $insertStatement = $db->prepare("
                     INSERT INTO seller_delivery_areas (seller_profile_id, city_id, district_id, delivery_fee, free_from_amount)
                     VALUES (:seller_profile_id, :city_id, :district_id, :delivery_fee, :free_from_amount)
@@ -961,7 +926,7 @@ class SellerDashboardController extends DashboardController {
             
             $body = $this->request->getBody();
             
-            // u041fu0440u0435u0437u0430u0433u0440u0443u0437u0430u0435u043c u043du0430 u043du0430u043lu0438u0447u0438u0435 u0434u043eu0441u0442u0430u0432u043au0438
+            // Проверка наличия ID зоны доставки
             if (!isset($body['id'])) {
                 Application::$app->session->setFlash('error', 'Delivery area ID is required');
                 Application::$app->response->redirect('/seller/delivery-areas');
@@ -970,7 +935,7 @@ class SellerDashboardController extends DashboardController {
             
             $areaId = intval($body['id']);
             
-            // u041fu0440u0435u0437u0430u0433u0440u0443u0437u0430u0435u043c u043f0440u0438u043d0430u0434u043b0435u0436u043du043e0441u0442u0438 u0437u043eu043du044b u0434u043eu0441u0442u0430u0432u043au0438
+            // Проверка существования зоны доставки
             $db = Application::$app->db;
             $checkStatement = $db->prepare("
                 SELECT id FROM seller_delivery_areas 
@@ -987,7 +952,7 @@ class SellerDashboardController extends DashboardController {
                 return '';
             }
             
-            // u0423u0434u0430u043bu0438u0435u043c u0437u043eu043du044b u0434u043eu0441u0442u0430u0432u043au0438
+            // Удаление зоны доставки
             $deleteStatement = $db->prepare("
                 DELETE FROM seller_delivery_areas 
                 WHERE id = :id AND seller_profile_id = :seller_profile_id
@@ -1027,7 +992,7 @@ class SellerDashboardController extends DashboardController {
     }
     
     /**
-     * u041fu043eu0431u0440u0430u0436u0435u043du0438u0435 u0438 u0440u0435u0434u0430u043au0442u0438u0440u043eu0432u0430u043du0438u0435 u043fu0440u043eu0444u0438u043bu044h
+     * Обновление и редактирование профиля продавца
      * @return string
      */
     public function profile(): string {
@@ -1038,7 +1003,7 @@ class SellerDashboardController extends DashboardController {
             return Application::$app->response->redirect('/login');
         }
         
-        // u041fu0440u0435u043eu0431u0440u0430u0437u0443u0435u043c u043fu0440u043eu0444u0438u043bu044c u043fu0440u043eu0441u043bu0435 u043fu0440u043eu0441u043bu0435 u043fu0440u043eu0434u0430u0432u0446u0430
+        // Get seller profile
         $sellerProfile = $this->getSellerProfile($user->id);
         
         if (!$sellerProfile) {
@@ -1050,24 +1015,24 @@ class SellerDashboardController extends DashboardController {
             return Application::$app->response->redirect('/seller');
         }
         
-        // u041fu0440u0435u0437u0430u0433u0440u0443u0437u0430u0435u043c u0434u043e0441u0442u0443u043f u0441u043fu043e0440u0430 u043e043f043b0430u0442u044b
+        // Get payment methods
         $paymentMethods = [];
         $sellerPaymentOptions = [];
         
         try {
             $db = Application::$app->db;
             
-            // u0417u0430u043fu0440u043eu0441 u043du0430 u043fu0435u0440u0435u0447u0435u043du044c u0432u0441u0435u0445 u043au0430u0442u0435u0433043e0430440438u0439
+            // Get all payment methods
             $methodsStmt = $db->prepare("SELECT * FROM payment_methods ORDER BY method_name");
             $methodsStmt->execute();
             $paymentMethods = $methodsStmt->fetchAll(PDO::FETCH_ASSOC) ?: [];
             
-            // u0417u0430u043fu0440u043eu0441 u043du0430 u043fu0435u0440u0435u0447u0435u043du044c u0432 u0432u0438u0431u0440 u0438 u04310440u0430u043du043du044bu0443 u0441u043fu043e0441u043e0431u043e0432 u043e043f043b0430u0442u044b u043f0440u043e0434u0430u0432u0446u0430
+            // Get seller's payment options
             $optionsStmt = $db->prepare("SELECT payment_method_id FROM seller_payment_options WHERE seller_profile_id = :seller_profile_id");
             $optionsStmt->execute(['seller_profile_id' => $sellerProfile['id']]);
             $options = $optionsStmt->fetchAll(PDO::FETCH_ASSOC) ?: [];
             
-            // u041fu0440u0435u0437u0430u0433u0440u0443u0437u0430u0435u043c u0432 u043cu0430u0441u0441u0438u0432 ID
+            // Convert options to array of IDs
             $sellerPaymentOptions = array_map(function($option) {
                 return $option['payment_method_id'];
             }, $options);
@@ -1080,14 +1045,14 @@ class SellerDashboardController extends DashboardController {
             );
         }
         
-        // u041eu0431u0440u0430u0431u043eu0442u043au0430 POST-u0437u0430u043fu0440u043eu0441u0430 u0434u043bu044f u043e0431u043du043e0432u043bu0435u043du0438u044f u043fu0440u043eu0444u0438u043lu044h
+        // Handle POST request
         if ($this->request->isPost()) {
             $data = $this->request->getBody();
             
-            // u0412u0430u043bu0438u0434u0430u0446u0438u044f u0434u0430u043du043du044bu0443
+            // Validate data
             $errors = [];
             
-            // u041fu0440u0435u0437u0430u0433u0440u0443u0437u0430u0435u043c u043du0430 u043du0430u043lu0438u0447u0438u0435 u043eu0431u044fu0437u0430u0442u0435u043lu044cu043du044bu0443 u043fu0440u043eu0444u0438u043lu044h
+            // Check required fields
             if (empty($data['name'])) {
                 $errors[] = 'Shop name is required';
             }
@@ -1096,12 +1061,14 @@ class SellerDashboardController extends DashboardController {
                 $errors[] = 'Shop description is required';
             }
             
-            if (empty($errors)) {
+            if (!empty($errors)) {
+                Application::$app->session->setFlash('error', implode('<br>', $errors));
+            } else {
                 try {
                     $db = Application::$app->db;
                     $db->beginTransaction();
                     
-                    // u041eu0431u043du043e0432u043bu044fu0435u043c u043du0430 u043eu0441u043du043eu0432u043du044bu0443 u0434u0430u043du043du044bu0443 u043fu0440u043eu0444u0438u043lu044h
+                    // Update seller profile
                     $updateStmt = $db->prepare("
                         UPDATE seller_profiles 
                         SET name = :name, 
@@ -1121,93 +1088,15 @@ class SellerDashboardController extends DashboardController {
                         'min_order_amount' => !empty($data['min_order_amount']) ? (float)$data['min_order_amount'] : 50.00
                     ]);
                     
-                    // u041eu0431u0440u0430u0431u043eu0442u043au0430 u0441u043fu043e0440u0430 u0437u0430u0433u0440u0443u0437u043a0438 u0430u0432u0430u0442u0430u0440u0430
-                    if (isset($_FILES['avatar']) && $_FILES['avatar']['error'] === UPLOAD_ERR_OK) {
-                        $allowedTypes = ['image/avif', 'image/webp'];
-                        $maxSize = 100 * 1024; // 100KB
-                        
-                        if (in_array($_FILES['avatar']['type'], $allowedTypes) && $_FILES['avatar']['size'] <= $maxSize) {
-                            $uploadDir = __DIR__ . '/../../public/uploads/avatars/';
-                            
-                            // u0421u043eu0437u0434u0430u0435u043c u0434u0438u0440u0435u043au0442u043eu0440u0438u044e, u0435u0441u043lu0438 u043eu043du0430 u043du0435 u0441u0443u0447u0435u0441u0442u0432u0443u0435u0442
-                            if (!file_exists($uploadDir)) {
-                                mkdir($uploadDir, 0755, true);
-                            }
-                            
-                            $fileName = $user->id . '_' . time() . '.' . pathinfo($_FILES['avatar']['name'], PATHINFO_EXTENSION);
-                            $filePath = $uploadDir . $fileName;
-                            
-                            if (move_uploaded_file($_FILES['avatar']['tmp_name'], $filePath)) {
-                                // u041eu0431u043du043e0432u043bu044fu0435u043c u04380437043e0431u0440043004360435u043d0438u044f u0432 u0431u0430u0437u0435 u0434u0430u043du043du044bu0443
-                                $avatarUpdateStmt = $db->prepare("UPDATE seller_profiles SET avatar_url = :avatar_url WHERE user_id = :user_id");
-                                $avatarUpdateStmt->execute([
-                                    'user_id' => $user->id,
-                                    'avatar_url' => '/uploads/avatars/' . $fileName
-                                ]);
-                            } else {
-                                $errors[] = 'Failed to upload avatar';
-                            }
-                        } else {
-                            $errors[] = 'Invalid avatar file. Only AVIF and WebP formats are allowed, max size 100KB';
-                        }
-                    }
-                    
-                    // u041eu0431u0440u0430u0431u043eu0442u043au0430 u0441u043fu043e0440u0430 u0437u0430u0433u0440u0443u0437u043a0438 u0430u0432u0430u0442u0430u0440u0430
+                    // Update payment options
                     if (isset($data['payment_methods']) && is_array($data['payment_methods'])) {
-                        // u041fu0440u0435u0437u0430u0433u0440u0443u0437u0430u0435u043c u0432 u043cu0430u0441u0441u0438u0432 ID
-                        Application::$app->logger->info(
-                            'Attempting to add payment methods', 
-                            ['user_id' => $user->id, 'seller_profile_id' => $sellerProfile['id'], 'methods' => $data['payment_methods']],
-                            'users.log'
-                        );
+                        // Delete existing payment options
+                        $deletePaymentStmt = $db->prepare("DELETE FROM seller_payment_options WHERE seller_profile_id = :seller_profile_id");
+                        $deletePaymentStmt->execute(['seller_profile_id' => $sellerProfile['id']]);
                         
-                        // Сначала проверим структуру таблицы
-                        try {
-                            $tableStmt = $db->prepare("SHOW TABLES LIKE 'seller_payment_options'");
-                            $tableStmt->execute();
-                            if (!$tableStmt->fetch()) {
-                                // Таблица не существует, создаем её
-                                $createTableStmt = $db->prepare("
-                                    CREATE TABLE IF NOT EXISTS seller_payment_options (
-                                        id INT AUTO_INCREMENT PRIMARY KEY,
-                                        seller_profile_id INT NOT NULL,
-                                        payment_method_id INT NOT NULL,
-                                        enabled TINYINT(1) NOT NULL DEFAULT 1,
-                                        created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
-                                        UNIQUE KEY unique_seller_payment (seller_profile_id, payment_method_id)
-                                    ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
-                                ");
-                                $createTableStmt->execute();
-                                Application::$app->logger->info('Created seller_payment_options table', [], 'users.log');
-                            }
-                        } catch (\Exception $e) {
-                            Application::$app->logger->error(
-                                'Error checking/creating table', 
-                                ['error' => $e->getMessage()],
-                                'errors.log'
-                            );
-                        }
-                        
-                        // u0423u0434u0430u043bu0438u0435u043c u0442u0435u043au0443u0447u0438u0435 u0441u043fu043e0440u0430 u0437u0430u0433u0440u0443u0437u043a0438 u0430u0432u0430u0442u0430u0440u0430
-                        try {
-                            $deletePaymentStmt = $db->prepare("DELETE FROM seller_payment_options WHERE seller_profile_id = :seller_profile_id");
-                            $deletePaymentStmt->execute(['seller_profile_id' => $sellerProfile['id']]);
-                            Application::$app->logger->info(
-                                'Deleted existing payment methods', 
-                                ['seller_profile_id' => $sellerProfile['id']],
-                                'users.log'
-                            );
-                        } catch (\Exception $e) {
-                            Application::$app->logger->error(
-                                'Error deleting payment methods', 
-                                ['error' => $e->getMessage()],
-                                'errors.log'
-                            );
-                        }
-                        
-                        // u0414u043eu0431u0430u0432u043bu0435u043du0438u0435 u043du0435u0432u044b u0441u043fu043e0440u0430 u0437u0430u0433u0440u0443u0437u043a0438 u0430u0432u0430u0442u0430u0440u0430
+                        // Add new payment options
                         foreach ($data['payment_methods'] as $methodId) {
-                            // Простая проверка на валидность ID метода оплаты
+                            // Check if method ID is valid
                             if (!is_numeric($methodId) || (int)$methodId <= 0) {
                                 Application::$app->logger->error(
                                     'Invalid payment method ID', 
@@ -1217,7 +1106,7 @@ class SellerDashboardController extends DashboardController {
                                 continue;
                             }
                             
-                            // Проверяем, существует ли метод оплаты
+                            // Check if payment method exists
                             $checkMethodStmt = $db->prepare("SELECT id FROM payment_methods WHERE id = :id");
                             $checkMethodStmt->execute(['id' => (int)$methodId]);
                             if (!$checkMethodStmt->fetch()) {
@@ -1229,60 +1118,26 @@ class SellerDashboardController extends DashboardController {
                                 continue;
                             }
                             
-                            // Логируем попытку добавления
-                            Application::$app->logger->info(
-                                'Attempting to add payment method', 
-                                ['user_id' => $user->id, 'seller_profile_id' => $sellerProfile['id'], 'method_id' => $methodId],
-                                'users.log'
-                            );
+                            // Add payment option
+                            $insertPaymentStmt = $db->prepare("
+                                INSERT INTO seller_payment_options (seller_profile_id, payment_method_id, enabled)
+                                VALUES (:seller_profile_id, :payment_method_id, :enabled)
+                            ");
+                            $insertResult = $insertPaymentStmt->execute([
+                                'seller_profile_id' => $sellerProfile['id'],
+                                'payment_method_id' => (int)$methodId,
+                                'enabled' => 1
+                            ]);
                             
-                            try {
-                                // Используем максимально простой запрос
-                                $sql = "INSERT INTO seller_payment_options (seller_profile_id, payment_method_id, enabled) VALUES (?, ?, ?)"; 
-                                $insertPaymentStmt = $db->prepare($sql);
-                                $insertResult = $insertPaymentStmt->execute([(int)$sellerProfile['id'], (int)$methodId, 1]);
-                                
-                                // Логируем результат
-                                if (!$insertResult) {
-                                    $errorInfo = $insertPaymentStmt->errorInfo();
-                                    Application::$app->logger->error(
-                                        'Failed to add payment method', 
-                                        ['user_id' => $user->id, 'error' => $errorInfo],
-                                        'errors.log'
-                                    );
-                                } else {
-                                    Application::$app->logger->info(
-                                        'Payment method added successfully', 
-                                        ['user_id' => $user->id, 'method_id' => $methodId],
-                                        'users.log'
-                                    );
-                                }
-                            } catch (\Exception $e) {
+                            if (!$insertResult) {
+                                $errorInfo = $insertPaymentStmt->errorInfo();
                                 Application::$app->logger->error(
-                                    'Exception adding payment method', 
-                                    ['user_id' => $user->id, 'error' => $e->getMessage()],
+                                    'Failed to add payment method', 
+                                    ['user_id' => $user->id, 'error' => $errorInfo],
                                     'errors.log'
                                 );
                             }
                         }
-                        
-                        // Логируем выбранные способы оплаты
-                        Application::$app->logger->info(
-                            'Payment methods selected', 
-                            ['user_id' => $user->id, 'seller_profile_id' => $sellerProfile['id'], 'methods' => $data['payment_methods']],
-                            'users.log'
-                        );
-                    } else {
-                        // Если не выбрано ни одного способа оплаты, удаляем все существующие
-                        $deletePaymentStmt = $db->prepare("DELETE FROM seller_payment_options WHERE seller_profile_id = :seller_profile_id");
-                        $deletePaymentStmt->execute(['seller_profile_id' => $sellerProfile['id']]);
-                        
-                        // Логируем удаление всех способов оплаты
-                        Application::$app->logger->info(
-                            'All payment methods removed', 
-                            ['user_id' => $user->id, 'seller_profile_id' => $sellerProfile['id']],
-                            'users.log'
-                        );
                     }
                     
                     $db->commit();
@@ -1303,10 +1158,8 @@ class SellerDashboardController extends DashboardController {
                         );
                     }
                     
-                    // u041fu0440u0435u0437u0430u0433u0440u0443u0437u0430u0435u043c u043fu0440u043eu0444u0438u043b044c u043fu0440u043eu0441u043bu0435 u043e0431u043du043e0432u043b0435u043d0438u044f
+                    // Update seller profile and payment options
                     $sellerProfile = $this->getSellerProfile($user->id);
-                    
-                    // u041fu0440u0435u0437u0430u0433u0440u0443u0437u0430u0435u043c u0441u043fu043e0440u0430 u0437u0430u0433u0440u0443u0437u043a0438 u0430u0432u0430u0442u0430u0440u0430
                     $optionsStmt = $db->prepare("SELECT payment_method_id FROM seller_payment_options WHERE seller_profile_id = :seller_profile_id");
                     $optionsStmt->execute(['seller_profile_id' => $sellerProfile['id']]);
                     $options = $optionsStmt->fetchAll(PDO::FETCH_ASSOC) ?: [];
@@ -1323,8 +1176,6 @@ class SellerDashboardController extends DashboardController {
                         'errors.log'
                     );
                 }
-            } else {
-                Application::$app->session->setFlash('error', implode('<br>', $errors));
             }
         }
         
@@ -1337,11 +1188,14 @@ class SellerDashboardController extends DashboardController {
         ]);
     }
     
-    public function addProduct(): string {
+    public function addProduct(): string|\App\Core\Response {
         $user = $this->getUserProfile();
         
         if (!$user) {
-            Application::$app->session->setFlash('error', 'You must be logged in to access this page');
+            if ($this->request->isAjax()) {
+                return Application::$app->response->json(['success' => false, 'message' => 'Вы должны быть авторизованы'], 401);
+            }
+            Application::$app->session->setFlash('error', 'Вы должны быть авторизованы');
             return Application::$app->response->redirect('/login');
         }
         
@@ -1354,13 +1208,21 @@ class SellerDashboardController extends DashboardController {
                 ['user_id' => $user->id],
                 'products.log'
             );
+            
+            if ($this->request->isAjax()) {
+                return Application::$app->response->json(['success' => false, 'message' => 'Для добавления товаров необходимо иметь профиль продавца'], 403);
+            }
+            
             Application::$app->session->setFlash('error', 'Для добавления товаров необходимо иметь профиль продавца');
             return Application::$app->response->redirect('/seller');
         }
-
+        
         // Проверка метода запроса
         if (!$this->request->isPost()) {
-            return $this->response->redirect('/seller/products/new');
+            if ($this->request->isAjax()) {
+                return Application::$app->response->json(['success' => false, 'message' => 'Недопустимый метод запроса'], 405);
+            }
+            return Application::$app->response->redirect('/seller/products/new');
         }
 
         // Получение данных из формы
@@ -1371,7 +1233,7 @@ class SellerDashboardController extends DashboardController {
         $errors = [];
 
         // Проверка обязательных полей
-        $requiredFields = ['product_name', 'description', 'price', 'category_id'];
+        $requiredFields = ['product_name', 'description', 'price', 'category_id', 'ingredients'];
         foreach ($requiredFields as $field) {
             if (empty($body[$field])) {
                 $errors[$field] = 'Это поле обязательно для заполнения';
@@ -1381,6 +1243,11 @@ class SellerDashboardController extends DashboardController {
         // Проверка цены
         if (isset($body['price']) && (!is_numeric($body['price']) || floatval($body['price']) <= 0)) {
             $errors['price'] = 'Цена должна быть положительным числом';
+        }
+        
+        // Проверка количества ингредиентов
+        if (!isset($body['ingredients']) || !is_array($body['ingredients']) || count($body['ingredients']) < 2) {
+            $errors['ingredients'] = 'Необходимо выбрать минимум 2 ингредиента';
         }
 
         // Проверка изображения
@@ -1399,8 +1266,22 @@ class SellerDashboardController extends DashboardController {
             }
         }
 
-        // Если есть ошибки, возвращаемся на форму
+        // Если есть ошибки, возвращаемся на форму или отправляем JSON с ошибками
         if (!empty($errors)) {
+            Application::$app->logger->warning(
+                'Product validation failed', 
+                ['user_id' => $user->id, 'errors' => $errors],
+                'products.log'
+            );
+            
+            if ($this->request->isAjax()) {
+                return Application::$app->response->json([
+                    'success' => false, 
+                    'message' => 'Ошибка валидации данных',
+                    'errors' => $errors
+                ], 400);
+            }
+            
             // Преобразуем массив ошибок в строку для корректной работы с setFlash
             $errorMessages = '';
             foreach ($errors as $field => $message) {
@@ -1409,11 +1290,7 @@ class SellerDashboardController extends DashboardController {
             
             Application::$app->session->setFlash('errors', $errorMessages);
             Application::$app->session->setFlash('old', json_encode($body));
-            Application::$app->logger->warning(
-                'Product validation failed', 
-                ['user_id' => $user->id, 'errors' => $errors],
-                'products.log'
-            );
+            
             return Application::$app->response->redirect('/seller/products/new');
         }
 
@@ -1432,33 +1309,19 @@ class SellerDashboardController extends DashboardController {
             }
 
             // Определение статуса доступности товара
-            $isAvailable = 1; // По умолчанию товар доступен
-            if (isset($body['product_status'])) {
-                switch ($body['product_status']) {
-                    case 'active':
-                        $isActive = 1;
-                        $isPreorder = 0;
-                        break;
-                    case 'inactive':
-                        $isActive = 0;
-                        $isPreorder = 0;
-                        break;
-                    case 'preorder':
-                        $isActive = 1;
-                        $isPreorder = 1;
-                        break;
-                }
-            }
+            $productStatus = $body['product_status'] ?? 'inactive';
+            $isActive = ($productStatus === 'active' || $productStatus === 'preorder') ? 1 : 0;
+            $isPreorder = ($productStatus === 'preorder') ? 1 : 0;
             
             // Сохранение товара в базу данных
             $db = Application::$app->db;
             $statement = $db->prepare("
                 INSERT INTO products (
                     product_name, description, price, seller_profile_id,
-                    is_active, available_for_preorder, quantity, weight
+                    is_active, available_for_preorder, quantity, weight, category_id
                 ) VALUES (
                     :product_name, :description, :price, :seller_profile_id,
-                    :is_active, :available_for_preorder, :quantity, :weight
+                    :is_active, :available_for_preorder, :quantity, :weight, :category_id
                 )
             ");
 
@@ -1467,10 +1330,11 @@ class SellerDashboardController extends DashboardController {
                 'description' => $body['description'],
                 'price' => floatval($body['price']),
                 'seller_profile_id' => $sellerProfile['id'],
-                'is_active' => $isAvailable,
-                'available_for_preorder' => isset($body['available_for_preorder']) ? 1 : 0,
+                'is_active' => $isActive,
+                'available_for_preorder' => $isPreorder,
                 'quantity' => isset($body['quantity']) ? intval($body['quantity']) : 1,
-                'weight' => isset($body['weight']) ? intval($body['weight']) : 0
+                'weight' => isset($body['weight']) ? intval($body['weight']) : 0,
+                'category_id' => !empty($body['category_id']) ? intval($body['category_id']) : null
             ]);
 
             if ($result) {
@@ -1492,12 +1356,49 @@ class SellerDashboardController extends DashboardController {
                     throw new \Exception('Ошибка при сохранении изображения');
                 }
                 
+                // Сохранение выбранных ингредиентов в таблицу product_ingredients
+                if (isset($body['ingredients']) && is_array($body['ingredients'])) {
+                    foreach ($body['ingredients'] as $ingredientId) {
+                        // Get the ingredient name from the base_ingredients table
+                        $getIngredientStmt = $db->prepare("SELECT name FROM base_ingredients WHERE id = :id");
+                        $getIngredientStmt->execute(['id' => $ingredientId]);
+                        $ingredientName = $getIngredientStmt->fetchColumn();
+                        
+                        if (!$ingredientName) {
+                            continue; // Skip if ingredient not found
+                        }
+                        
+                        $ingredientStatement = $db->prepare("
+                            INSERT INTO product_ingredients (product_id, ingredient_name, ingredient_percentage)
+                            VALUES (:product_id, :ingredient_name, :ingredient_percentage)
+                        ");
+                        
+                        $ingredientResult = $ingredientStatement->execute([
+                            'product_id' => $productId,
+                            'ingredient_name' => $ingredientName,
+                            'ingredient_percentage' => 0.00
+                        ]);
+                        
+                        if (!$ingredientResult) {
+                            throw new \Exception('Ошибка при сохранении ингредиентов');
+                        }
+                    }
+                }
+                
                 Application::$app->logger->info(
                     'New product added', 
                     ['user_id' => $user->id, 'product_id' => $productId, 'product_name' => $body['product_name']],
                     'products.log'
                 );
 
+                if ($this->request->isAjax()) {
+                    return Application::$app->response->json([
+                        'success' => true, 
+                        'message' => 'Товар успешно добавлен',
+                        'product_id' => $productId
+                    ]);
+                }
+                
                 Application::$app->session->setFlash('success', 'Товар успешно добавлен');
                 return Application::$app->response->redirect('/seller/products');
             } else {
@@ -1515,8 +1416,14 @@ class SellerDashboardController extends DashboardController {
                 'errors.log'
             );
 
+            if ($this->request->isAjax()) {
+                return Application::$app->response->json([
+                    'success' => false, 
+                    'message' => 'Произошла ошибка при добавлении товара: ' . $e->getMessage()
+                ], 500);
+            }
+            
             Application::$app->session->setFlash('error', 'Произошла ошибка при добавлении товара: ' . $e->getMessage());
-            Application::$app->session->setFlash('old', json_encode($body));
             return Application::$app->response->redirect('/seller/products/new');
         }
     }
@@ -1730,7 +1637,7 @@ class SellerDashboardController extends DashboardController {
             
             // If phone is not set, use a default value
             if (!isset($result['phone']) || empty($result['phone'])) {
-                $result['phone'] = 'u043du043eu043cu0435u0440 u0442u0435u043bu0435u0444u043eu043du0430 u043eu0431u044fu0437u0430u0442u0435u043bu0435u043d';
+                $result['phone'] = 'Номер телефона не указан';
             }
             
             return $result;
@@ -1769,6 +1676,101 @@ class SellerDashboardController extends DashboardController {
             );
             
             return [];
+        }
+    }
+
+
+    protected function getBaseIngredients(): array {
+        try {
+            $sql = "SELECT id, name, category, kosher, allergen FROM base_ingredients ORDER BY category, name";
+            $statement = Application::$app->db->prepare($sql);
+            $statement->execute();
+            return $statement->fetchAll(PDO::FETCH_ASSOC);
+        } catch (\Exception $e) {
+            Application::$app->logger->error(
+                'Ошибка при получении ингредиентов: ' . $e->getMessage(),
+                ['trace' => $e->getTraceAsString()],
+                'errors.log'
+            );
+            return [];
+        }
+    }
+
+
+    protected function getCategories(): array {
+        try {
+            $sql = "SELECT id, name, description FROM categories";
+            $statement = Application::$app->db->prepare($sql);
+            $statement->execute();
+            return $statement->fetchAll(PDO::FETCH_ASSOC);
+        } catch (\Exception $e) {
+            // u0417u0430u043fu0440u043eu0441 u043eu0448u0438u0431u043au0438 u0432 u043lu043eu0433
+            Application::$app->logger->error(
+                'Ошибка при получении категорий: ' . $e->getMessage(),
+                ['trace' => $e->getTraceAsString()],
+                'errors.log'
+            );
+            return [];
+        }
+    }
+
+    public function deleteProduct($productId) {
+        Application::$app->logger->info(
+            'Request to delete product', 
+            ['product_id' => $productId],
+            'products.log'
+        );
+
+        try {
+            // Получаем информацию о продукте
+            $productStmt = Application::$app->db->prepare(
+                "SELECT p.*, sp.user_id 
+                 FROM products p 
+                 JOIN seller_profiles sp ON p.seller_profile_id = sp.id 
+                 WHERE p.id = :product_id"
+            );
+            $productStmt->execute(['product_id' => $productId]);
+            $product = $productStmt->fetch();
+
+            if (!$product) {
+                Application::$app->logger->warning(
+                    'Attempt to delete non-existent product', 
+                    ['product_id' => $productId],
+                    'errors.log'
+                );
+                return json_encode(['success' => false, 'message' => 'Продукт не найден']);
+            }
+
+            // Проверяем, что пользователь имеет право удалять этот продукт
+            $currentUser = $this->getUserProfile();
+            if ((int)$currentUser->id !== (int)$product['user_id']) {
+                Application::$app->logger->warning(
+                    'Unauthorized attempt to delete product', 
+                    ['product_id' => $productId, 'user_id' => $currentUser->id],
+                    'security.log'
+                );
+                return json_encode(['success' => false, 'message' => 'Нет прав на удаление']);
+            }
+
+            // Удаляем продукт
+            $deleteStmt = Application::$app->db->prepare("DELETE FROM products WHERE id = :product_id");
+            $deleteStmt->execute(['product_id' => $productId]);
+
+            Application::$app->logger->info(
+                'Product deleted successfully', 
+                ['product_id' => $productId, 'user_id' => $currentUser->id],
+                'products.log'
+            );
+
+            return json_encode(['success' => true, 'message' => 'Продукт успешно удален']);
+
+        } catch (Exception $e) {
+            Application::$app->logger->error(
+                'Error deleting product', 
+                ['product_id' => $productId, 'error' => $e->getMessage()],
+                'errors.log'
+            );
+            return json_encode(['success' => false, 'message' => 'Ошибка при удалении продукта: ' . $e->getMessage()]);
         }
     }
 }

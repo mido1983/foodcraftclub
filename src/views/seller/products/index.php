@@ -183,7 +183,7 @@
             <div class="modal-body">
                 <p>Вы уверены, что хотите удалить продукт <strong id="deleteProductName"></strong>?</p>
                 <p class="text-danger">Это действие невозможно отменить.</p>
-                <form id="deleteProductForm" action="/seller/products/delete" method="post">
+                <form id="deleteProductForm" action="/seller/products/delete/" method="post">
                     <input type="hidden" id="deleteProductId" name="id">
                 </form>
             </div>
@@ -225,11 +225,53 @@
             });
         });
         
-        // Инициализация кнопок удаления
-        document.querySelectorAll('.delete-product-btn').forEach(function(button) {
+        // Обработчик для кнопок удаления
+        document.querySelectorAll('.delete-product-btn').forEach(button => {
             button.addEventListener('click', function() {
-                document.getElementById('deleteProductId').value = this.dataset.id;
-                document.getElementById('deleteProductName').textContent = this.dataset.name;
+                const id = this.dataset.id;
+                const name = this.dataset.name;
+                
+                // Обновляем текст в модальном окне
+                document.getElementById('deleteProductName').textContent = name;
+                
+                // Обновляем URL формы
+                const form = document.getElementById('deleteProductForm');
+                form.action = `/seller/products/delete/${id}`;
+                
+                // Устанавливаем значение скрытого поля
+                document.getElementById('deleteProductId').value = id;
+            });
+        });
+
+        // Обработчик отправки формы
+        document.getElementById('deleteProductForm').addEventListener('submit', function(e) {
+            e.preventDefault();
+            
+            const form = this;
+            const id = this.querySelector('input[name="id"]').value;
+            
+            // Отправляем AJAX-запрос
+            fetch(`/seller/products/delete/${id}`, {
+                method: 'POST',
+                headers: {
+                    'Content-Type': 'application/json',
+                    'X-Requested-With': 'XMLHttpRequest'
+                },
+                credentials: 'same-origin',
+                body: JSON.stringify({ id: id })
+            })
+            .then(response => response.json())
+            .then(data => {
+                if (data.success) {
+                    // Обновляем список продуктов
+                    window.location.reload();
+                } else {
+                    alert(data.message || 'Ошибка при удалении продукта');
+                }
+            })
+            .catch(error => {
+                console.error('Error:', error);
+                alert('Произошла ошибка при удалении продукта');
             });
         });
         

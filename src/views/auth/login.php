@@ -27,6 +27,7 @@
                     
                     <div class="text-center mt-4">
                         <p class="mb-0">Contact an administrator if you need an account</p>
+                        <p class="mt-2"><a href="/forgot-password" class="text-decoration-none">Forgot your password?</a></p>
                     </div>
                 </div>
             </div>

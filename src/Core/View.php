@@ -4,6 +4,12 @@ namespace App\Core;
 
 class View {
     public string $title = '';
+    public string $csrf_token = '';
+
+    public function __construct() {
+        // Генерируем CSRF токен при создании объекта View
+        $this->csrf_token = Application::$app->session->getCsrfToken();
+    }
 
     public function renderView($view, $params = []) {
         $viewContent = $this->renderViewOnly($view, $params);
@@ -24,6 +30,9 @@ class View {
     }
 
     protected function renderViewOnly($view, $params) {
+        // Добавляем CSRF токен к параметрам представления
+        $params['csrf_token'] = $this->csrf_token;
+        
         foreach ($params as $key => $value) {
             $$key = $value;
         }
@@ -47,5 +56,15 @@ class View {
             'cancelled' => 'danger',
             default => 'secondary',
         };
+    }
+    
+    /**
+     * Escape HTML special characters in a string
+     * 
+     * @param string $string String to escape
+     * @return string Escaped string
+     */
+    public static function escape(string $string): string {
+        return htmlspecialchars($string, ENT_QUOTES | ENT_HTML5, 'UTF-8');
     }
 }

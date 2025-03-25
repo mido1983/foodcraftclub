@@ -142,6 +142,11 @@
                 <p class="card-text text-muted mb-1 product-seller"></p>
                 <p class="card-text text-muted mb-3 product-category"></p>
                 
+                <div class="product-ingredients mb-3">
+                    <small class="text-muted">Состав:</small>
+                    <div class="ingredients-list"></div>
+                </div>
+                
                 <div class="d-flex align-items-center mb-3">
                     <div class="me-2">
                         <span class="product-rating">0.0</span>
@@ -197,6 +202,11 @@
                         <p class="text-muted mb-3">
                             Категория: <span id="modal-product-category"></span>
                         </p>
+                        
+                        <div class="mb-3">
+                            <h6 class="mb-2">Состав:</h6>
+                            <div id="modal-product-ingredients" class="mb-3"></div>
+                        </div>
                         
                         <h5 class="mt-4">Описание</h5>
                         <p id="modal-product-description"></p>
@@ -514,6 +524,26 @@
                     quantityWarning.classList.add('d-none');
                 }
                 
+                // Отображаем ингредиенты
+                const ingredientsList = card.querySelector('.ingredients-list');
+                if (product.ingredients && product.ingredients.length > 0) {
+                    // Создаем список ингредиентов
+                    const ingredientsHtml = product.ingredients.map(ingredient => {
+                        const badges = [];
+                        if (ingredient.allergen == 1) {
+                            badges.push('<span class="badge bg-danger ms-1" title="Аллерген">A</span>');
+                        }
+                        if (ingredient.kosher == 1) {
+                            badges.push('<span class="badge bg-primary ms-1" title="Кошерный">K</span>');
+                        }
+                        return `<span class="badge bg-light text-dark me-1 mb-1">${ingredient.name}${badges.join('')}</span>`;
+                    }).join('');
+                    
+                    ingredientsList.innerHTML = ingredientsHtml;
+                } else {
+                    ingredientsList.innerHTML = '<span class="text-muted">Ингредиенты не указаны</span>';
+                }
+                
                 // Добавляем карточку в контейнер
                 container.appendChild(card);
             });
@@ -569,6 +599,26 @@
                 quantityText.textContent = `В наличии: ${product.quantity}`;
                 quantityText.classList.remove('d-none');
                 quantityWarning.classList.add('d-none');
+            }
+            
+            // Отображаем ингредиенты
+            const ingredientsList = document.getElementById('modal-product-ingredients');
+            if (product.ingredients && product.ingredients.length > 0) {
+                // Создаем список ингредиентов
+                const ingredientsHtml = product.ingredients.map(ingredient => {
+                    const badges = [];
+                    if (ingredient.allergen == 1) {
+                        badges.push('<span class="badge bg-danger ms-1" title="Аллерген">A</span>');
+                    }
+                    if (ingredient.kosher == 1) {
+                        badges.push('<span class="badge bg-primary ms-1" title="Кошерный">K</span>');
+                    }
+                    return `<span class="badge bg-light text-dark me-1 mb-1">${ingredient.name}${badges.join('')}</span>`;
+                }).join('');
+                
+                ingredientsList.innerHTML = ingredientsHtml;
+            } else {
+                ingredientsList.innerHTML = '<span class="text-muted">Ингредиенты не указаны</span>';
             }
             
             // Открываем модальное окно

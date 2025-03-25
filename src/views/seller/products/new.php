@@ -3,6 +3,7 @@
  * @var App\Models\User $user
  * @var array $sellerProfile
  * @var array $categories
+ * @var array $ingredients
  */
 ?>
 
@@ -102,6 +103,43 @@
                             <div class="form-text">Отметьте, если продукт доступен для предзаказа</div>
                         </div>
                         
+                        <div class="mb-3">
+                            <label class="form-label">Ингредиенты</label>
+                            <div class="alert alert-info">Выберите минимум 2 ингредиента для вашего продукта</div>
+                            <div class="row">
+                                <?php 
+                                $categories = [];
+                                foreach ($ingredients as $ingredient) {
+                                    if (!isset($categories[$ingredient['category']])) {
+                                        $categories[$ingredient['category']] = [];
+                                    }
+                                    $categories[$ingredient['category']][] = $ingredient;
+                                }
+                                
+                                foreach ($categories as $category => $categoryIngredients): ?>
+                                    <div class="col-md-4 mb-3">
+                                        <h5><?= htmlspecialchars($category) ?></h5>
+                                        <?php foreach ($categoryIngredients as $ingredient): ?>
+                                            <div class="form-check">
+                                                <input class="form-check-input ingredient-checkbox" type="checkbox" 
+                                                       name="ingredients[]" value="<?= $ingredient['id'] ?>" 
+                                                       id="ingredient-<?= $ingredient['id'] ?>">
+                                                <label class="form-check-label" for="ingredient-<?= $ingredient['id'] ?>">
+                                                    <?= htmlspecialchars($ingredient['name']) ?>
+                                                    <?php if ($ingredient['allergen']): ?>
+                                                        <span class="badge bg-warning text-dark">Аллерген</span>
+                                                    <?php endif; ?>
+                                                    <?php if ($ingredient['kosher']): ?>
+                                                        <span class="badge bg-info">Кошерный</span>
+                                                    <?php endif; ?>
+                                                </label>
+                                            </div>
+                                        <?php endforeach; ?>
+                                    </div>
+                                <?php endforeach; ?>
+                            </div>
+                        </div>
+                        
                         <div class="d-grid gap-2 d-md-flex justify-content-md-end">
                             <a href="/seller/products" class="btn btn-secondary me-md-2">Отмена</a>
                             <button type="submit" class="btn btn-primary">Сохранить продукт</button>
@@ -114,62 +152,191 @@
 </div>
 
 <script>
-// Добавляем JavaScript для валидации формы на стороне клиента
+// Добавляем JavaScript для валидации формы на стороне клиента и отправки через AJAX
 document.addEventListener('DOMContentLoaded', function() {
     const form = document.getElementById('addProductForm');
+    const ingredientCheckboxes = document.querySelectorAll('.ingredient-checkbox');
+    
+    // Восстановление данных формы из localStorage при загрузке страницы
+    restoreFormData();
+    
+    // Сохранение данных формы при изменении полей
+    const formInputs = form.querySelectorAll('input, textarea, select');
+    formInputs.forEach(input => {
+        input.addEventListener('change', function() {
+            saveFormData();
+        });
+    });
     
     form.addEventListener('submit', function(event) {
-        let isValid = true;
-        const name = document.getElementById('productName').value.trim();
-        const description = document.getElementById('productDescription').value.trim();
-        const price = document.getElementById('productPrice').value;
-        const image = document.getElementById('productImage').files[0];
-        const quantity = document.getElementById('productQuantity').value;
-        const weight = document.getElementById('productWeight').value;
+        // Предотвращаем стандартную отправку формы
+        event.preventDefault();
         
-        // Проверка названия
-        if (name.length === 0 || name.length > 100) {
-            isValid = false;
-            alert('Название продукта должно содержать от 1 до 100 символов');
-        }
-        
-        // Проверка описания
-        if (description.length === 0) {
-            isValid = false;
-            alert('Пожалуйста, добавьте описание продукта');
-        }
-        
-        // Проверка цены
-        if (price <= 0) {
-            isValid = false;
-            alert('Цена должна быть больше нуля');
-        }
-        
-        // Проверка количества
-        if (quantity < 1) {
-            isValid = false;
-            alert('Количество должно быть больше нуля');
-        }
-        
-        // Проверка файла изображения, если он был выбран
-        if (image) {
-            const allowedTypes = ['image/avif', 'image/webp'];
-            const maxSize = 100 * 1024; // 100KB
-            
-            if (!allowedTypes.includes(image.type)) {
-                isValid = false;
-                alert('Пожалуйста, загрузите изображение в формате AVIF или WebP');
+        // Проверка выбора минимум 2 ингредиентов
+        let selectedIngredients = 0;
+        ingredientCheckboxes.forEach(function(checkbox) {
+            if (checkbox.checked) {
+                selectedIngredients++;
             }
-            
-            if (image.size > maxSize) {
-                isValid = false;
-                alert('Размер изображения не должен превышать 100KB');
-            }
+        });
+        
+        if (selectedIngredients < 1) {
+            alert('Необходимо выбрать минимум 1 ингредиент для продукта');
+            return false;
         }
         
-        if (!isValid) {
-            event.preventDefault();
-        }
+        // Отправка формы через AJAX
+        submitFormAjax();
     });
+    
+    // Функция для сохранения данных формы в localStorage
+    function saveFormData() {
+        const formData = {};
+        
+        // Сохраняем значения текстовых полей, select и чекбоксов
+        form.querySelectorAll('input[type="text"], input[type="number"], textarea, select').forEach(input => {
+            formData[input.name] = input.value;
+        });
+        
+        // Сохраняем состояние чекбоксов
+        form.querySelectorAll('input[type="checkbox"]').forEach(checkbox => {
+            if (checkbox.name === 'ingredients[]') {
+                if (!formData['ingredients']) {
+                    formData['ingredients'] = [];
+                }
+                if (checkbox.checked) {
+                    formData['ingredients'].push(checkbox.value);
+                }
+            } else {
+                formData[checkbox.name] = checkbox.checked;
+            }
+        });
+        
+        localStorage.setItem('addProductFormData', JSON.stringify(formData));
+    }
+    
+    // Функция для восстановления данных формы из localStorage
+    function restoreFormData() {
+        const savedData = localStorage.getItem('addProductFormData');
+        if (!savedData) return;
+        
+        const formData = JSON.parse(savedData);
+        
+        // Восстанавливаем значения текстовых полей, select и чекбоксов
+        Object.keys(formData).forEach(key => {
+            if (key === 'ingredients') return; // Ингредиенты обрабатываем отдельно
+            
+            const input = form.querySelector(`[name="${key}"]`);
+            if (input) {
+                if (input.type === 'checkbox') {
+                    input.checked = formData[key];
+                } else {
+                    input.value = formData[key];
+                }
+            }
+        });
+        
+        // Восстанавливаем выбранные ингредиенты
+        if (formData['ingredients'] && Array.isArray(formData['ingredients'])) {
+            formData['ingredients'].forEach(ingredientId => {
+                const checkbox = form.querySelector(`input[name="ingredients[]"][value="${ingredientId}"]`);
+                if (checkbox) {
+                    checkbox.checked = true;
+                }
+            });
+        }
+    }
+    
+    // Функция для отправки формы через AJAX
+    function submitFormAjax() {
+        // Показываем индикатор загрузки
+        const submitBtn = form.querySelector('button[type="submit"]');
+        const originalBtnText = submitBtn.innerHTML;
+        submitBtn.disabled = true;
+        submitBtn.innerHTML = '<span class="spinner-border spinner-border-sm" role="status" aria-hidden="true"></span> Сохранение...';
+        
+        // Создаем объект FormData для отправки данных формы, включая файлы
+        const formData = new FormData(form);
+        
+        // Отправляем запрос на сервер
+        fetch('/seller/products/add', {
+            method: 'POST',
+            body: formData,
+            headers: {
+                'X-Requested-With': 'XMLHttpRequest'
+            }
+        })
+        .then(response => response.json())
+        .then(data => {
+            // Восстанавливаем кнопку
+            submitBtn.disabled = false;
+            submitBtn.innerHTML = originalBtnText;
+            
+            if (data.success) {
+                // Очищаем сохраненные данные формы
+                localStorage.removeItem('addProductFormData');
+                
+                // Показываем сообщение об успехе
+                const alertContainer = document.createElement('div');
+                alertContainer.className = 'alert alert-success';
+                alertContainer.textContent = data.message || 'Продукт успешно добавлен';
+                
+                // Вставляем сообщение перед формой
+                const cardBody = form.closest('.card-body');
+                cardBody.insertBefore(alertContainer, form);
+                
+                // Перенаправляем на страницу продуктов через 2 секунды
+                setTimeout(() => {
+                    window.location.href = '/seller/products';
+                }, 2000);
+            } else {
+                // Показываем сообщение об ошибке
+                const alertContainer = document.createElement('div');
+                alertContainer.className = 'alert alert-danger';
+                alertContainer.textContent = data.message || 'Произошла ошибка при добавлении продукта';
+                
+                // Если есть конкретные ошибки валидации, показываем их
+                if (data.errors) {
+                    const errorList = document.createElement('ul');
+                    Object.keys(data.errors).forEach(key => {
+                        const errorItem = document.createElement('li');
+                        errorItem.textContent = data.errors[key];
+                        errorList.appendChild(errorItem);
+                    });
+                    alertContainer.appendChild(errorList);
+                }
+                
+                // Вставляем сообщение перед формой
+                const cardBody = form.closest('.card-body');
+                cardBody.insertBefore(alertContainer, form);
+                
+                // Удаляем сообщение через 5 секунд
+                setTimeout(() => {
+                    alertContainer.remove();
+                }, 5000);
+            }
+        })
+        .catch(error => {
+            console.error('Ошибка при отправке формы:', error);
+            
+            // Восстанавливаем кнопку
+            submitBtn.disabled = false;
+            submitBtn.innerHTML = originalBtnText;
+            
+            // Показываем сообщение об ошибке
+            const alertContainer = document.createElement('div');
+            alertContainer.className = 'alert alert-danger';
+            alertContainer.textContent = 'Произошла ошибка при отправке формы. Пожалуйста, попробуйте еще раз.';
+            
+            // Вставляем сообщение перед формой
+            const cardBody = form.closest('.card-body');
+            cardBody.insertBefore(alertContainer, form);
+            
+            // Удаляем сообщение через 5 секунд
+            setTimeout(() => {
+                alertContainer.remove();
+            }, 5000);
+        });
+    }
 });
 </script>

@@ -4,8 +4,10 @@ namespace App\Controllers;
 
 use App\Core\Controller;
 use App\Core\Application;
+use App\Core\Mailer;
 use App\Core\Middleware\AuthMiddleware;
 use App\Models\User;
+use App\Models\PasswordReset;
 
 class AuthController extends Controller {
     public function __construct() {
@@ -154,6 +156,268 @@ class AuthController extends Controller {
         Application::$app->session->destroy();
         Application::$app->session->setFlash('success', 'You have been logged out');
         return Application::$app->response->redirect('/');
+    }
+    
+    /**
+     * Handle forgot password request
+     * @return string|null
+     */
+    public function forgotPassword(): string|null {
+        $this->view->title = 'Восстановление пароля';
+        
+        if (Application::$app->request->isPost()) {
+            // Для AJAX запросов
+            if (Application::$app->request->isAjax()) {
+                $data = Application::$app->request->getJsonBody();
+                $email = $data['email'] ?? '';
+                
+                // Проверка CSRF токена
+                $csrfToken = Application::$app->request->getHeader('X-CSRF-Token');
+                if (!Application::$app->session->validateCsrfToken($csrfToken)) {
+                    return json_encode([
+                        'success' => false,
+                        'message' => 'Недействительный CSRF токен'
+                    ]);
+                }
+            } else {
+                // Для обычных POST запросов
+                $data = Application::$app->request->getBody();
+                $email = $data['email'] ?? '';
+            }
+            
+            // Проверка формата email
+            if (empty($email) || !filter_var($email, FILTER_VALIDATE_EMAIL)) {
+                if (Application::$app->request->isAjax()) {
+                    return json_encode([
+                        'success' => false,
+                        'message' => 'Пожалуйста, введите корректный email'
+                    ]);
+                } else {
+                    Application::$app->session->setFlash('error', 'Пожалуйста, введите корректный email');
+                    return $this->render('auth/forgot-password');
+                }
+            }
+            
+            // Поиск пользователя
+            $user = User::findOne(['email' => $email]);
+            
+            // Даже если пользователь не найден, мы не сообщаем об этом для безопасности
+            if ($user) {
+                // Создаем токен для сброса пароля
+                $passwordReset = new PasswordReset();
+                $passwordReset->user_id = $user->id;
+                $passwordReset->token = bin2hex(random_bytes(32)); // 64-символьный токен
+                $passwordReset->expires_at = date('Y-m-d H:i:s', strtotime('+1 hour')); // Срок действия 1 час
+                $passwordReset->save();
+                
+                // Логируем действие
+                Application::$app->logger->info(
+                    'Password reset requested', 
+                    ['user_id' => $user->id, 'email' => $email],
+                    'users.log'
+                );
+                
+                // Отправка email с ссылкой для сброса пароля
+                $mailer = new Mailer();
+                $resetUrl = Application::$app->request->getBaseUrl() . '/reset-password?token=' . $passwordReset->token;
+                
+                // Логирование ссылки для сброса пароля
+                Application::$app->logger->info(
+                    'Reset password link', 
+                    ['user_id' => $user->id, 'reset_link' => $resetUrl],
+                    'users.log'
+                );
+                
+                // Отправляем электронное письмо
+                $mailer->sendPasswordResetEmail($email, $passwordReset->token, $user->name ?? 'Пользователь');
+            }
+            
+            // Всегда возвращаем успешный ответ для безопасности
+            if (Application::$app->request->isAjax()) {
+                return json_encode([
+                    'success' => true,
+                    'message' => 'Если указанный email зарегистрирован в системе, мы отправили на него инструкции по восстановлению пароля'
+                ]);
+            } else {
+                Application::$app->session->setFlash('success', 'Если указанный email зарегистрирован в системе, мы отправили на него инструкции по восстановлению пароля');
+                return Application::$app->response->redirect('/login');
+            }
+        }
+        
+        return $this->render('auth/forgot-password');
+    }
+    
+    /**
+     * Handle password reset
+     * @return string|null
+     */
+    public function resetPassword(): string|null {
+        $this->view->title = 'Сброс пароля';
+        
+        // Обработка GET запроса - отображение формы сброса пароля
+        if (Application::$app->request->isGet()) {
+            $token = Application::$app->request->getQueryParam('token');
+            
+            if (empty($token)) {
+                Application::$app->session->setFlash('error', 'Недействительный токен сброса пароля');
+                return Application::$app->response->redirect('/login');
+            }
+            
+            // Проверка валидности токена
+            $passwordReset = PasswordReset::findOne(['token' => $token]);
+            
+            if (!$passwordReset || strtotime($passwordReset->expires_at) < time()) {
+                Application::$app->session->setFlash('error', 'Токен сброса пароля недействителен или истек срок его действия');
+                return Application::$app->response->redirect('/login');
+            }
+            
+            return $this->render('auth/reset-password', ['token' => $token]);
+        }
+        
+        // Обработка POST запроса - сброс пароля
+        if (Application::$app->request->isPost()) {
+            // Для AJAX запросов
+            if (Application::$app->request->isAjax()) {
+                $data = Application::$app->request->getJsonBody();
+                $token = $data['token'] ?? '';
+                $password = $data['password'] ?? '';
+                $passwordConfirm = $data['password_confirm'] ?? '';
+                
+                // Проверка CSRF токена
+                $csrfToken = Application::$app->request->getHeader('X-CSRF-Token');
+                if (!Application::$app->session->validateCsrfToken($csrfToken)) {
+                    return json_encode([
+                        'success' => false,
+                        'message' => 'Недействительный CSRF токен'
+                    ]);
+                }
+            } else {
+                // Для обычных POST запросов
+                $data = Application::$app->request->getBody();
+                $token = $data['token'] ?? '';
+                $password = $data['password'] ?? '';
+                $passwordConfirm = $data['password_confirm'] ?? '';
+            }
+            
+            // Проверка наличия данных
+            if (empty($token) || empty($password) || empty($passwordConfirm)) {
+                $errorMessage = 'Все поля обязательны для заполнения';
+                
+                if (Application::$app->request->isAjax()) {
+                    return json_encode([
+                        'success' => false,
+                        'message' => $errorMessage
+                    ]);
+                } else {
+                    Application::$app->session->setFlash('error', $errorMessage);
+                    return $this->render('auth/reset-password', ['token' => $token]);
+                }
+            }
+            
+            // Проверка совпадения паролей
+            if ($password !== $passwordConfirm) {
+                $errorMessage = 'Пароли не совпадают';
+                
+                if (Application::$app->request->isAjax()) {
+                    return json_encode([
+                        'success' => false,
+                        'message' => $errorMessage
+                    ]);
+                } else {
+                    Application::$app->session->setFlash('error', $errorMessage);
+                    return $this->render('auth/reset-password', ['token' => $token]);
+                }
+            }
+            
+            // Проверка сложности пароля
+            if (strlen($password) < 8) {
+                $errorMessage = 'Пароль должен быть не менее 8 символов';
+                
+                if (Application::$app->request->isAjax()) {
+                    return json_encode([
+                        'success' => false,
+                        'message' => $errorMessage
+                    ]);
+                } else {
+                    Application::$app->session->setFlash('error', $errorMessage);
+                    return $this->render('auth/reset-password', ['token' => $token]);
+                }
+            }
+            
+            // Поиск записи о сбросе пароля
+            $passwordReset = PasswordReset::findOne(['token' => $token]);
+            
+            if (!$passwordReset || strtotime($passwordReset->expires_at) < time()) {
+                $errorMessage = 'Токен сброса пароля недействителен или истек срок его действия';
+                
+                if (Application::$app->request->isAjax()) {
+                    return json_encode([
+                        'success' => false,
+                        'message' => $errorMessage
+                    ]);
+                } else {
+                    Application::$app->session->setFlash('error', $errorMessage);
+                    return Application::$app->response->redirect('/login');
+                }
+            }
+            
+            // Поиск пользователя
+            $user = User::findOne(['id' => $passwordReset->user_id]);
+            
+            if (!$user) {
+                $errorMessage = 'Пользователь не найден';
+                
+                if (Application::$app->request->isAjax()) {
+                    return json_encode([
+                        'success' => false,
+                        'message' => $errorMessage
+                    ]);
+                } else {
+                    Application::$app->session->setFlash('error', $errorMessage);
+                    return Application::$app->response->redirect('/login');
+                }
+            }
+            
+            // Обновление пароля
+            $user->setPassword($password);
+            $result = $user->save();
+            
+            if ($result) {
+                // Удаление записи о сбросе пароля
+                $passwordReset->delete();
+                
+                // Логирование успешного сброса пароля
+                Application::$app->logger->info(
+                    'Password reset successful', 
+                    ['user_id' => $user->id],
+                    'users.log'
+                );
+                
+                if (Application::$app->request->isAjax()) {
+                    return json_encode([
+                        'success' => true,
+                        'message' => 'Пароль успешно изменен'
+                    ]);
+                } else {
+                    Application::$app->session->setFlash('success', 'Пароль успешно изменен. Теперь вы можете войти с новым паролем.');
+                    return Application::$app->response->redirect('/login');
+                }
+            } else {
+                $errorMessage = 'Ошибка при обновлении пароля';
+                
+                if (Application::$app->request->isAjax()) {
+                    return json_encode([
+                        'success' => false,
+                        'message' => $errorMessage
+                    ]);
+                } else {
+                    Application::$app->session->setFlash('error', $errorMessage);
+                    return $this->render('auth/reset-password', ['token' => $token]);
+                }
+            }
+        }
+        
+        return Application::$app->response->redirect('/login');
     }
     
     /**

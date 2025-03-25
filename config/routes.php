@@ -19,6 +19,12 @@ $router->get('/login', [AuthController::class, 'login']);
 $router->post('/login', [AuthController::class, 'login']);
 $router->get('/logout', [AuthController::class, 'logout']);
 
+// Password recovery routes
+$router->get('/forgot-password', [AuthController::class, 'forgotPassword']);
+$router->post('/forgot-password', [AuthController::class, 'forgotPassword']);
+$router->get('/reset-password', [AuthController::class, 'resetPassword']);
+$router->post('/reset-password', [AuthController::class, 'resetPassword']);
+
 // Admin routes (protected by middleware)
 $router->get('/admin', [AdminController::class, 'index']);
 $router->get('/admin/users', [AdminController::class, 'users']);
@@ -102,7 +108,7 @@ $router->get('/seller/products/fix-images', [SellerDashboardController::class, '
 $router->get('/seller/products/new', [SellerDashboardController::class, 'newProduct']); 
 $router->post('/seller/products/add', [SellerDashboardController::class, 'addProduct']);
 $router->post('/seller/products/edit', [SellerDashboardController::class, 'updateProduct']);
-$router->post('/seller/products/delete', [SellerDashboardController::class, 'deleteProduct']);
+$router->post('/seller/products/delete/{id}', [SellerDashboardController::class, 'deleteProduct']);
 $router->get('/seller/orders', [SellerDashboardController::class, 'orders']);
 $router->get('/seller/orders/{id}', [SellerDashboardController::class, 'viewOrder']);
 $router->post('/seller/orders/{id}/update-status', [SellerDashboardController::class, 'updateOrderStatus']);

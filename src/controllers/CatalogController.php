@@ -51,7 +51,7 @@ class CatalogController extends Controller {
         // u041fu043eu043bu0443u0447u0430u0435u043c u0434u0430u043du043du044bu0435 u0438u0437 JSON-u0437u0430u043fu0440u043eu0441u0430
         $data = $request->isAjax() ? $request->getJson() : $request->getBody();
         
-        // u0415u0441u043bu0438 u0434u0430u043du043du044bu0435 u043du0435 u043fu043eu043bu0443u0447u0435u043du044b, u0438u0441u043fu043eu043bu044cu0437u0443u0435u043c u043fu0443u0441u0442u043eu0439 u043cu0430u0441u0441u0438u0432
+        // u0415u0441u043bu0438 u0434u0430u043du043du044bu0435 u043du0435 u043fu043eu043bu0443u0447u0435u043du0442u044b, u0438u0441u043fu043eu043bu044cu0437u0443u0435u043c u043fu0443u0441u0442u043eu0439 u043cu0430u0441u0441u0438u0432
         if ($data === null) {
             $data = [];
         }
@@ -210,6 +210,20 @@ class CatalogController extends Controller {
                 // Set availability flags
                 $product['available'] = $product['is_active'] == 1;
                 $product['preorder'] = $product['available_for_preorder'] == 1;
+                
+                // u041fu043eu043bu0443u0447u0430u0435u043c u0438u043du0433u0440u0435u0434u0438u0435u043du0442u044b u0434u043bu044fu043eu0440u043eu0434u0443u043au0442u0430
+                $ingredientsSql = "SELECT bi.id, bi.name, bi.category, bi.kosher, bi.allergen 
+                                   FROM product_ingredients pi
+                                   JOIN base_ingredients bi ON pi.ingredient_name COLLATE utf8mb4_unicode_ci = bi.name COLLATE utf8mb4_unicode_ci
+                                   WHERE pi.product_id = :product_id
+                                   ORDER BY bi.category, bi.name";
+                
+                $ingredientsStmt = Application::$app->db->prepare($ingredientsSql);
+                $ingredientsStmt->execute(['product_id' => $product['id']]);
+                $ingredients = $ingredientsStmt->fetchAll(\PDO::FETCH_ASSOC);
+                
+                // u0414u043eu0431u0430u0432u043bu044fu0435u043c u0438u043du0433u0440u0435u0434u0438u0435u043du0442u044b u0432 u043fu0440u043eu0434u0443u043au0442
+                $product['ingredients'] = $ingredients;
             }
             
             // Add debug information
