@@ -174,10 +174,12 @@ class AuthController extends Controller {
                 // Проверка CSRF токена
                 $csrfToken = Application::$app->request->getHeader('X-CSRF-Token');
                 if (!Application::$app->session->validateCsrfToken($csrfToken)) {
-                    return json_encode([
+                    header('Content-Type: application/json');
+                    echo json_encode([
                         'success' => false,
                         'message' => 'Недействительный CSRF токен'
                     ]);
+                    exit;
                 }
             } else {
                 // Для обычных POST запросов
@@ -188,10 +190,12 @@ class AuthController extends Controller {
             // Проверка формата email
             if (empty($email) || !filter_var($email, FILTER_VALIDATE_EMAIL)) {
                 if (Application::$app->request->isAjax()) {
-                    return json_encode([
+                    header('Content-Type: application/json');
+                    echo json_encode([
                         'success' => false,
                         'message' => 'Пожалуйста, введите корректный email'
                     ]);
+                    exit;
                 } else {
                     Application::$app->session->setFlash('error', 'Пожалуйста, введите корректный email');
                     return $this->render('auth/forgot-password');
@@ -201,7 +205,6 @@ class AuthController extends Controller {
             // Поиск пользователя
             $user = User::findOne(['email' => $email]);
             
-            // Даже если пользователь не найден, мы не сообщаем об этом для безопасности
             if ($user) {
                 // Создаем токен для сброса пароля
                 $passwordReset = new PasswordReset();
@@ -239,10 +242,12 @@ class AuthController extends Controller {
             
             // Всегда возвращаем успешный ответ для безопасности
             if (Application::$app->request->isAjax()) {
-                return json_encode([
+                header('Content-Type: application/json');
+                echo json_encode([
                     'success' => true,
                     'message' => 'Если указанный email зарегистрирован в системе, мы отправили на него инструкции по восстановлению пароля'
                 ]);
+                exit;
             } else {
                 Application::$app->session->setFlash('success', 'Если указанный email зарегистрирован в системе, мы отправили на него инструкции по восстановлению пароля');
                 return Application::$app->response->redirect('/login');
@@ -323,10 +328,12 @@ class AuthController extends Controller {
                 // Проверка CSRF токена
                 $csrfToken = Application::$app->request->getHeader('X-CSRF-Token');
                 if (!Application::$app->session->validateCsrfToken($csrfToken)) {
-                    return json_encode([
+                    header('Content-Type: application/json');
+                    echo json_encode([
                         'success' => false,
                         'message' => 'Недействительный CSRF токен'
                     ]);
+                    exit;
                 }
             } else {
                 // Для обычных POST запросов
@@ -341,10 +348,12 @@ class AuthController extends Controller {
                 $errorMessage = 'Все поля обязательны для заполнения';
                 
                 if (Application::$app->request->isAjax()) {
-                    return json_encode([
+                    header('Content-Type: application/json');
+                    echo json_encode([
                         'success' => false,
                         'message' => $errorMessage
                     ]);
+                    exit;
                 } else {
                     Application::$app->session->setFlash('error', $errorMessage);
                     return $this->render('auth/reset-password', ['token' => $token]);
@@ -356,10 +365,12 @@ class AuthController extends Controller {
                 $errorMessage = 'Пароли не совпадают';
                 
                 if (Application::$app->request->isAjax()) {
-                    return json_encode([
+                    header('Content-Type: application/json');
+                    echo json_encode([
                         'success' => false,
                         'message' => $errorMessage
                     ]);
+                    exit;
                 } else {
                     Application::$app->session->setFlash('error', $errorMessage);
                     return $this->render('auth/reset-password', ['token' => $token]);
@@ -371,10 +382,12 @@ class AuthController extends Controller {
                 $errorMessage = 'Пароль должен быть не менее 8 символов';
                 
                 if (Application::$app->request->isAjax()) {
-                    return json_encode([
+                    header('Content-Type: application/json');
+                    echo json_encode([
                         'success' => false,
                         'message' => $errorMessage
                     ]);
+                    exit;
                 } else {
                     Application::$app->session->setFlash('error', $errorMessage);
                     return $this->render('auth/reset-password', ['token' => $token]);
@@ -419,10 +432,12 @@ class AuthController extends Controller {
                 $errorMessage = 'Токен сброса пароля недействителен или истек срок его действия';
                 
                 if (Application::$app->request->isAjax()) {
-                    return json_encode([
+                    header('Content-Type: application/json');
+                    echo json_encode([
                         'success' => false,
                         'message' => $errorMessage
                     ]);
+                    exit;
                 } else {
                     Application::$app->session->setFlash('error', $errorMessage);
                     return Application::$app->response->redirect('/login');
@@ -436,10 +451,12 @@ class AuthController extends Controller {
                 $errorMessage = 'Пользователь не найден';
                 
                 if (Application::$app->request->isAjax()) {
-                    return json_encode([
+                    header('Content-Type: application/json');
+                    echo json_encode([
                         'success' => false,
                         'message' => $errorMessage
                     ]);
+                    exit;
                 } else {
                     Application::$app->session->setFlash('error', $errorMessage);
                     return Application::$app->response->redirect('/login');
@@ -462,10 +479,12 @@ class AuthController extends Controller {
                 );
                 
                 if (Application::$app->request->isAjax()) {
-                    return json_encode([
+                    header('Content-Type: application/json');
+                    echo json_encode([
                         'success' => true,
                         'message' => 'Пароль успешно изменен'
                     ]);
+                    exit;
                 } else {
                     Application::$app->session->setFlash('success', 'Пароль успешно изменен. Теперь вы можете войти с новым паролем.');
                     return Application::$app->response->redirect('/login');
@@ -474,10 +493,12 @@ class AuthController extends Controller {
                 $errorMessage = 'Ошибка при обновлении пароля';
                 
                 if (Application::$app->request->isAjax()) {
-                    return json_encode([
+                    header('Content-Type: application/json');
+                    echo json_encode([
                         'success' => false,
                         'message' => $errorMessage
                     ]);
+                    exit;
                 } else {
                     Application::$app->session->setFlash('error', $errorMessage);
                     return $this->render('auth/reset-password', ['token' => $token]);

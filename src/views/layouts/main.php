@@ -25,6 +25,13 @@
                         </a>
                     </li>
                     <?php if (\App\Core\Application::$app->session->isLoggedIn()): ?>
+                        <?php if (\App\Core\Application::$app->session->hasRole('customer')): ?>
+                            <li class="nav-item">
+                                <a class="nav-link" href="/customer/dashboard">
+                                    <i class="bi bi-speedometer2"></i> Dashboard
+                                </a>
+                            </li>
+                        <?php endif; ?>
                         <?php if (\App\Core\Application::$app->session->hasRole('seller')): ?>
                             <li class="nav-item">
                                 <a class="nav-link" href="/seller/dashboard">
@@ -83,13 +90,23 @@
                             </a>
                             <ul class="dropdown-menu dropdown-menu-end">
                                 <li>
-                                    <a class="dropdown-item" href="/seller/profile">
+                                    <a class="dropdown-item" href="/customer/profile">
                                         <i class="bi bi-person"></i> Profile
                                     </a>
                                 </li>
                                 <li>
-                                    <a class="dropdown-item" href="/orders">
-                                        <i class="bi bi-cart"></i> Orders
+                                    <a class="dropdown-item" href="/customer/dashboard/orders">
+                                        <i class="bi bi-bag"></i> My Orders
+                                    </a>
+                                </li>
+                                <li>
+                                    <a class="dropdown-item" href="/customer/dashboard/wishlist">
+                                        <i class="bi bi-heart"></i> Wishlist
+                                    </a>
+                                </li>
+                                <li>
+                                    <a class="dropdown-item" href="/customer/dashboard/preorders">
+                                        <i class="bi bi-calendar-check"></i> Pre-orders
                                     </a>
                                 </li>
                                 <li><hr class="dropdown-divider"></li>

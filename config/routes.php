@@ -4,6 +4,7 @@ use App\Controllers\SiteController;
 use App\Controllers\AuthController;
 use App\Controllers\AdminController;
 use App\Controllers\SellerDashboardController;
+use App\Controllers\CustomerDashboardController;
 use App\Controllers\CatalogController;
 use App\Controllers\CartController;
 use App\Controllers\CheckoutController;
@@ -61,6 +62,17 @@ $router->get('/checkout', [CheckoutController::class, 'index']);
 $router->post('/checkout/process', [CheckoutController::class, 'process']);
 $router->get('/checkout/success', [CheckoutController::class, 'success']);
 $router->get('/checkout/cancel', [CheckoutController::class, 'cancel']);
+
+// Customer Dashboard routes
+$router->get('/customer/dashboard', [CustomerDashboardController::class, 'index']);
+$router->get('/customer/profile', [CustomerDashboardController::class, 'profile']);
+$router->post('/customer/profile/update', [CustomerDashboardController::class, 'updateProfile']);
+$router->post('/customer/profile/address/add', [CustomerDashboardController::class, 'addAddress']);
+$router->post('/customer/profile/address/update', [CustomerDashboardController::class, 'updateAddress']);
+$router->post('/customer/profile/address/delete', [CustomerDashboardController::class, 'deleteAddress']);
+$router->get('/customer/dashboard/orders', [CustomerDashboardController::class, 'orders']);
+$router->get('/customer/dashboard/wishlist', [CustomerDashboardController::class, 'wishlist']);
+$router->get('/customer/dashboard/preorders', [CustomerDashboardController::class, 'preorders']);
 
 // Debug route (temporary)
 $router->get('/debug/logs', function() {

@@ -161,4 +161,12 @@ class Request {
         $host = $_SERVER['HTTP_HOST'] ?? 'localhost';
         return $protocol . '://' . $host;
     }
+    
+    /**
+     * Get uploaded files
+     * @return array Uploaded files array
+     */
+    public function getFiles(): array {
+        return $_FILES;
+    }
 }

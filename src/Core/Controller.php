@@ -6,13 +6,20 @@ abstract class Controller {
     public string $action = '';
     protected array $middlewares = [];
     public string $layout = 'main';
-    protected View $view;
+    protected ?View $view = null;
 
     public function __construct() {
-        $this->view = Application::$app->view;
+        if (isset(Application::$app->view)) {
+            $this->view = Application::$app->view;
+        } else {
+            $this->view = new View();
+        }
     }
 
     public function render($view, $params = []) {
+        if ($this->view === null) {
+            $this->view = new View();
+        }
         return $this->view->renderView($view, $params);
     }
 

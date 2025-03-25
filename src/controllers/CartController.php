@@ -96,6 +96,7 @@ class CartController extends Controller {
         
         if (!$request->isAjax()) {
             $response->setStatusCode(400);
+            header('Content-Type: application/json');
             echo json_encode(['success' => false, 'message' => 'Invalid request']);
             return;
         }
@@ -104,6 +105,7 @@ class CartController extends Controller {
         
         if (!isset($data['product_id']) || !isset($data['quantity'])) {
             $response->setStatusCode(400);
+            header('Content-Type: application/json');
             echo json_encode(['success' => false, 'message' => 'Missing required parameters']);
             return;
         }
@@ -120,6 +122,7 @@ class CartController extends Controller {
         
         if (!$product) {
             $response->setStatusCode(404);
+            header('Content-Type: application/json');
             echo json_encode(['success' => false, 'message' => 'Товар не найден']);
             return;
         }
@@ -127,6 +130,7 @@ class CartController extends Controller {
         // Check if product is available
         if ($product['is_active'] != 1 && $product['available_for_preorder'] != 1) {
             $response->setStatusCode(400);
+            header('Content-Type: application/json');
             echo json_encode(['success' => false, 'message' => 'Товар не доступен']);
             return;
         }
@@ -134,6 +138,7 @@ class CartController extends Controller {
         // Проверяем доступное количество товара
         if ($quantity > $product['quantity']) {
             $response->setStatusCode(400);
+            header('Content-Type: application/json');
             echo json_encode([
                 'success' => false, 
                 'message' => "Недостаточное количество товара. Доступно: {$product['quantity']}"
@@ -166,6 +171,7 @@ class CartController extends Controller {
         $cartItems = $this->getCartItems();
         $totalAmount = $this->calculateCartTotal($cartItems);
         
+        header('Content-Type: application/json');
         echo json_encode([
             'success' => true, 
             'message' => 'Product added to cart',
@@ -188,6 +194,7 @@ class CartController extends Controller {
         
         if (!$request->isAjax()) {
             $response->setStatusCode(400);
+            header('Content-Type: application/json');
             echo json_encode(['success' => false, 'message' => 'Invalid request']);
             return;
         }
@@ -197,6 +204,7 @@ class CartController extends Controller {
         
         if (!isset($data['product_id'])) {
             $response->setStatusCode(400);
+            header('Content-Type: application/json');
             echo json_encode(['success' => false, 'message' => 'Missing product_id parameter']);
             return;
         }
@@ -215,6 +223,7 @@ class CartController extends Controller {
             $cartItems = $this->getCartItems();
             $totalAmount = $this->calculateCartTotal($cartItems);
             
+            header('Content-Type: application/json');
             echo json_encode([
                 'success' => true, 
                 'message' => 'Product removed from cart',
@@ -223,6 +232,7 @@ class CartController extends Controller {
             ]);
         } else {
             $response->setStatusCode(404);
+            header('Content-Type: application/json');
             echo json_encode(['success' => false, 'message' => 'Product not found in cart']);
         }
     }
@@ -238,6 +248,7 @@ class CartController extends Controller {
         
         if (!$request->isAjax()) {
             $response->setStatusCode(400);
+            header('Content-Type: application/json');
             echo json_encode(['success' => false, 'message' => 'Invalid request']);
             return;
         }
@@ -246,6 +257,7 @@ class CartController extends Controller {
         
         if (!isset($data['product_id']) || !isset($data['quantity'])) {
             $response->setStatusCode(400);
+            header('Content-Type: application/json');
             echo json_encode(['success' => false, 'message' => 'Missing required parameters']);
             return;
         }
@@ -263,12 +275,14 @@ class CartController extends Controller {
         $product = $this->getProductById($productId);
         if (!$product) {
             $response->setStatusCode(404);
+            header('Content-Type: application/json');
             echo json_encode(['success' => false, 'message' => 'Товар не найден']);
             return;
         }
         
         if ($quantity > $product['quantity']) {
             $response->setStatusCode(400);
+            header('Content-Type: application/json');
             echo json_encode([
                 'success' => false, 
                 'message' => "Недостаточное количество товара. Доступно: {$product['quantity']}"
@@ -288,6 +302,7 @@ class CartController extends Controller {
             $cartItems = $this->getCartItems();
             $totalAmount = $this->calculateCartTotal($cartItems);
             
+            header('Content-Type: application/json');
             echo json_encode([
                 'success' => true, 
                 'message' => 'Cart updated',
@@ -297,6 +312,7 @@ class CartController extends Controller {
             ]);
         } else {
             $response->setStatusCode(404);
+            header('Content-Type: application/json');
             echo json_encode(['success' => false, 'message' => 'Product not found in cart']);
         }
     }

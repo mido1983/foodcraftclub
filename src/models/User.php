@@ -12,6 +12,11 @@ class User extends DbModel {
     public string $password_hash = '';
     public string $full_name = '';
     public string $status = 'active';
+    public ?string $phone = null;
+    public bool $notification_order = true;
+    public bool $notification_promo = false;
+    public bool $notification_system = true;
+    public ?string $avatar = null;
     
     private array $roles = [];
     
@@ -40,7 +45,9 @@ class User extends DbModel {
             $statement = $db->prepare("
                 UPDATE users 
                 SET email = :email, password_hash = :password_hash, 
-                    full_name = :full_name
+                    full_name = :full_name, avatar = :avatar,
+                    phone = :phone, notification_order = :notification_order,
+                    notification_promo = :notification_promo, notification_system = :notification_system
                 WHERE id = :id
             ");
             
@@ -65,7 +72,12 @@ class User extends DbModel {
                 'id' => $this->id,
                 'email' => $this->email,
                 'password_hash' => $this->password_hash,
-                'full_name' => $this->full_name
+                'full_name' => $this->full_name,
+                'avatar' => $this->avatar,
+                'phone' => $this->phone,
+                'notification_order' => $this->notification_order ? 1 : 0,
+                'notification_promo' => $this->notification_promo ? 1 : 0,
+                'notification_system' => $this->notification_system ? 1 : 0
             ];
             
             Application::$app->logger->debug("User::save() - Параметры запроса: " . json_encode($params), ['user_id' => $this->id], 'users.log');
@@ -94,15 +106,20 @@ class User extends DbModel {
             }
 
             $statement = $db->prepare("
-                INSERT INTO users (email, password_hash, full_name, status)
-                VALUES (:email, :password_hash, :full_name, :status)
+                INSERT INTO users (email, password_hash, full_name, status, avatar, phone, notification_order, notification_promo, notification_system)
+                VALUES (:email, :password_hash, :full_name, :status, :avatar, :phone, :notification_order, :notification_promo, :notification_system)
             ");
 
             $params = [
                 'email' => $this->email,
                 'password_hash' => $this->password_hash,
                 'full_name' => $this->full_name,
-                'status' => $this->status
+                'status' => $this->status,
+                'avatar' => $this->avatar,
+                'phone' => $this->phone,
+                'notification_order' => $this->notification_order ? 1 : 0,
+                'notification_promo' => $this->notification_promo ? 1 : 0,
+                'notification_system' => $this->notification_system ? 1 : 0
             ];
 
             Application::$app->logger->debug("User::save() - Параметры запроса: " . json_encode($params), ['email' => $this->email], 'users.log');

@@ -25,9 +25,42 @@ try {
     die("DB ERROR: " . $e->getMessage());
 }
 
-// Run migrations
+// SQL files to execute directly
+$sqlFiles = [
+    'create_wishlists_table.sql',
+    'create_preorders_table.sql',
+    'create_user_addresses_table.sql'
+];
+
+// Execute each SQL file directly
+foreach ($sqlFiles as $sqlFile) {
+    $sqlPath = __DIR__ . '/migrations/' . $sqlFile;
+    
+    if (!file_exists($sqlPath)) {
+        echo "SQL file not found: {$sqlPath}\n";
+        continue;
+    }
+    
+    try {
+        // Read SQL content
+        $sql = file_get_contents($sqlPath);
+        
+        // Execute SQL
+        echo "Executing SQL file: {$sqlFile}\n";
+        $app->db->pdo->exec($sql);
+        echo "SQL file executed successfully: {$sqlFile}\n";
+        
+    } catch (Exception $e) {
+        echo "Error executing SQL file {$sqlFile}: " . $e->getMessage() . "\n";
+    }
+}
+
+// Run PHP migrations
 try {
     $app->db->applyMigrations();
 } catch (Exception $e) {
-    die("Migration Error: " . $e->getMessage());
+    echo "Migration Warning: " . $e->getMessage() . "\n";
+    echo "PHP migrations may have partially completed.\n";
 }
+
+echo "\nAll migrations completed.\n";
