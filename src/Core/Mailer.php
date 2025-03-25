@@ -2,6 +2,9 @@
 
 namespace App\Core;
 
+use PHPMailer\PHPMailer\PHPMailer;
+use PHPMailer\PHPMailer\Exception;
+
 class Mailer {
     private string $host;
     private int $port;
@@ -10,6 +13,7 @@ class Mailer {
     private string $encryption;
     private string $fromEmail;
     private string $fromName;
+    private bool $debug;
     
     /**
      * Mailer constructor
@@ -23,6 +27,7 @@ class Mailer {
         $this->encryption = $_ENV['MAIL_ENCRYPTION'] ?? '';
         $this->fromEmail = $_ENV['MAIL_FROM_ADDRESS'] ?? 'noreply@foodcraftclub.com';
         $this->fromName = $_ENV['MAIL_FROM_NAME'] ?? 'Food Craft Club';
+        $this->debug = (bool)($_ENV['MAIL_DEBUG'] ?? false);
     }
     
     /**
@@ -43,36 +48,82 @@ class Mailer {
         );
         
         try {
-            // Заголовки письма
-            $headers = [
-                'MIME-Version: 1.0',
-                'Content-type: text/html; charset=UTF-8',
-                'From: ' . $this->fromName . ' <' . $this->fromEmail . '>',
-                'Reply-To: ' . $this->fromEmail,
-                'X-Mailer: PHP/' . phpversion()
-            ];
+            // Создаем экземпляр PHPMailer
+            $mail = new PHPMailer(true);
             
-            // Отправка письма с использованием встроенной функции mail
-            $success = mail($to, $subject, $body, implode("\r\n", $headers));
-            
-            if ($success) {
-                Application::$app->logger->info(
-                    "Email sent successfully", 
-                    ['to' => $to],
-                    'emails.log'
-                );
-                return true;
-            } else {
-                Application::$app->logger->error(
-                    "Failed to send email", 
-                    ['to' => $to, 'error' => error_get_last()],
-                    'emails.log'
-                );
-                return false;
+            // Включаем отладку если нужно
+            if ($this->debug) {
+                $mail->SMTPDebug = 2; // Подробный вывод для отладки
             }
-        } catch (\Exception $e) {
+            
+            // Проверяем, используем ли мы SMTP или локальную отправку
+            if (strtolower($_ENV['MAIL_MAILER'] ?? '') === 'smtp') {
+                // Настройка SMTP сервера
+                $mail->isSMTP();
+                $mail->Host = $this->host;
+                
+                // Настройка аутентификации только если указаны учетные данные
+                if (!empty($this->username) && !empty($this->password)) {
+                    $mail->SMTPAuth = true;
+                    $mail->Username = $this->username;
+                    $mail->Password = $this->password;
+                } else {
+                    $mail->SMTPAuth = false;
+                }
+                
+                $mail->Port = $this->port;
+                
+                // Настройка шифрования, если указано
+                if (!empty($this->encryption)) {
+                    if (strtolower($this->encryption) === 'tls') {
+                        $mail->SMTPSecure = PHPMailer::ENCRYPTION_STARTTLS;
+                    } elseif (strtolower($this->encryption) === 'ssl') {
+                        $mail->SMTPSecure = PHPMailer::ENCRYPTION_SMTPS;
+                    }
+                } else {
+                    // Если шифрование не указано, явно отключаем его
+                    $mail->SMTPSecure = false;
+                    $mail->SMTPAutoTLS = false;
+                }
+            } else {
+                // Используем встроенную функцию mail() для отправки
+                $mail->isMail();
+            }
+            
+            // Настройка отправителя и получателя
+            $mail->setFrom($this->fromEmail, $this->fromName);
+            $mail->addAddress($to);
+            $mail->isHTML(true);
+            
+            // Установка кодировки
+            $mail->CharSet = 'UTF-8';
+            
+            // Тема и содержимое письма
+            $mail->Subject = $subject;
+            $mail->Body = $body;
+            
+            // Добавление вложений, если есть
+            foreach ($attachments as $attachment) {
+                if (isset($attachment['path']) && file_exists($attachment['path'])) {
+                    $mail->addAttachment(
+                        $attachment['path'],
+                        $attachment['name'] ?? basename($attachment['path'])
+                    );
+                }
+            }
+            
+            // Отправка письма
+            $mail->send();
+            
+            Application::$app->logger->info(
+                "Email sent successfully", 
+                ['to' => $to],
+                'emails.log'
+            );
+            return true;
+        } catch (Exception $e) {
             Application::$app->logger->error(
-                "Exception when sending email", 
+                "Failed to send email", 
                 ['to' => $to, 'error' => $e->getMessage()],
                 'emails.log'
             );

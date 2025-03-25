@@ -31,6 +31,13 @@ abstract class DbModel {
     public static function findOne($id): ?self {
         $tableName = static::tableName();
         $primaryKey = static::primaryKey();
+        
+        // Проверка, что $id не является массивом
+        if (is_array($id)) {
+            // Если передан массив, используем findOneBy
+            return static::findOneBy([$primaryKey => $id[$primaryKey] ?? reset($id)]);
+        }
+        
         $statement = Application::$app->db->prepare("SELECT * FROM {$tableName} WHERE {$primaryKey} = :id");
         $statement->execute(['id' => $id]);
         $data = $statement->fetch(PDO::FETCH_ASSOC);

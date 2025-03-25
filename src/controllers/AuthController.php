@@ -207,7 +207,12 @@ class AuthController extends Controller {
                 $passwordReset = new PasswordReset();
                 $passwordReset->user_id = $user->id;
                 $passwordReset->token = bin2hex(random_bytes(32)); // 64-символьный токен
-                $passwordReset->expires_at = date('Y-m-d H:i:s', strtotime('+1 hour')); // Срок действия 1 час
+                
+                // Устанавливаем срок действия токена на 24 часа от текущего времени
+                $expiryTime = new \DateTime();
+                $expiryTime->modify('+24 hours');
+                $passwordReset->expires_at = $expiryTime->format('Y-m-d H:i:s');
+                
                 $passwordReset->save();
                 
                 // Логируем действие
@@ -256,7 +261,8 @@ class AuthController extends Controller {
         
         // Обработка GET запроса - отображение формы сброса пароля
         if (Application::$app->request->isGet()) {
-            $token = Application::$app->request->getQueryParam('token');
+            $params = Application::$app->request->getBody();
+            $token = $params['token'] ?? '';
             
             if (empty($token)) {
                 Application::$app->session->setFlash('error', 'Недействительный токен сброса пароля');
@@ -264,7 +270,38 @@ class AuthController extends Controller {
             }
             
             // Проверка валидности токена
-            $passwordReset = PasswordReset::findOne(['token' => $token]);
+            $token = trim($token);
+            
+            // Логируем полученный токен для сброса пароля
+            Application::$app->logger->info(
+                'Получен токен для сброса пароля',
+                ['token' => $token, 'token_length' => strlen($token)],
+                'users.log'
+            );
+            
+            // Используем PDO для безопасного выполнения SQL-запроса
+            $db = Application::$app->db;
+            $stmt = $db->prepare("SELECT * FROM password_resets WHERE token = :token");
+            $stmt->execute(['token' => $token]);
+            $passwordReset = $stmt->fetch(\PDO::FETCH_ASSOC);
+            
+            if ($passwordReset) {
+                // Преобразуем данные из базы в объект модели
+                $resetModel = new PasswordReset();
+                foreach ($passwordReset as $key => $value) {
+                    if (property_exists($resetModel, $key)) {
+                        $resetModel->{$key} = $value;
+                    }
+                }
+                $passwordReset = $resetModel;
+            }
+            
+            // Логируем результат поиска токена
+            Application::$app->logger->info(
+                'Результат поиска токена',
+                ['found' => (bool)$passwordReset, 'token' => $token],
+                'users.log'
+            );
             
             if (!$passwordReset || strtotime($passwordReset->expires_at) < time()) {
                 Application::$app->session->setFlash('error', 'Токен сброса пароля недействителен или истек срок его действия');
@@ -344,8 +381,39 @@ class AuthController extends Controller {
                 }
             }
             
-            // Поиск записи о сбросе пароля
-            $passwordReset = PasswordReset::findOne(['token' => $token]);
+            // Проверка валидности токена
+            $token = trim($token);
+            
+            // Логируем полученный токен для сброса пароля
+            Application::$app->logger->info(
+                'Получен токен для сброса пароля',
+                ['token' => $token, 'token_length' => strlen($token)],
+                'users.log'
+            );
+            
+            // Используем PDO для безопасного выполнения SQL-запроса
+            $db = Application::$app->db;
+            $stmt = $db->prepare("SELECT * FROM password_resets WHERE token = :token");
+            $stmt->execute(['token' => $token]);
+            $passwordReset = $stmt->fetch(\PDO::FETCH_ASSOC);
+            
+            if ($passwordReset) {
+                // Преобразуем данные из базы в объект модели
+                $resetModel = new PasswordReset();
+                foreach ($passwordReset as $key => $value) {
+                    if (property_exists($resetModel, $key)) {
+                        $resetModel->{$key} = $value;
+                    }
+                }
+                $passwordReset = $resetModel;
+            }
+            
+            // Логируем результат поиска токена
+            Application::$app->logger->info(
+                'Результат поиска токена',
+                ['found' => (bool)$passwordReset, 'token' => $token],
+                'users.log'
+            );
             
             if (!$passwordReset || strtotime($passwordReset->expires_at) < time()) {
                 $errorMessage = 'Токен сброса пароля недействителен или истек срок его действия';
