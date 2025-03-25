@@ -767,6 +767,7 @@ class CustomerDashboardController extends Controller
             // Обработка флага основного адреса
             if (isset($addressData['is_default'])) {
                 // Сбрасываем флаг основного адреса у других адресов
+                $db = Application::$app->db;
                 $resetSql = "UPDATE user_addresses SET is_default = 0 WHERE user_id = :user_id";
                 $resetStmt = $db->prepare($resetSql);
                 $resetStmt->execute(['user_id' => $user->id]);
